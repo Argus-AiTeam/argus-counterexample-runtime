@@ -430,6 +430,26 @@ def _set_stage(
         })
 
     state_path = write_pipeline_state(root, payload)
+    if evidence_root is not None:
+        ev_root = Path(evidence_root)
+        try:
+            if (
+                ev_root.resolve() != root.resolve()
+                and (ev_root / ".argus" / "PIPELINE_STATE.json").is_file()
+            ):
+                ev_payload = read_pipeline_state(ev_root) or {}
+                if isinstance(ev_payload, dict):
+                    for key in (
+                        "current_stage",
+                        "stages",
+                        "stage_history",
+                        "rollback_history",
+                    ):
+                        if key in payload:
+                            ev_payload[key] = payload[key]
+                    write_pipeline_state(ev_root, ev_payload)
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
     _sync_status_stage(Path(evidence_root or root), target)
     return str(state_path)
 
