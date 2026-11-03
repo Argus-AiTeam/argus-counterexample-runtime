@@ -212,6 +212,10 @@ def test_vendored_dependencies_are_not_the_projects_own_work(tmp_path: Path) -> 
     root = _project(tmp_path)
     for relative in (
         ".lake/packages/mathlib/Mathlib/Order/Basic.lean",
+        ".elan/toolchains/leanprover--lean4---v4.31.0/src/lean/Init/Prelude.lean",
+        ".work/exact-discrete/elan/toolchains/leanprover--lean4---v4.30.0/src/lean/Init/BinderNameHint.lean",
+        ".work/exact-discrete/formal-reproduction/superperm/Main.lean",
+        ".work/grade-a-example/sources/OfficialSource.lean",
         "research/lean/.lake/build/Vendored.lean",
         "lake-packages/std/Std/Data.lean",
     ):
@@ -219,8 +223,36 @@ def test_vendored_dependencies_are_not_the_projects_own_work(tmp_path: Path) -> 
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("theorem vendored : True := by trivial\n", encoding="utf-8")
 
+    submission = root / ".work" / "review" / "formal"
+    submission.mkdir(parents=True, exist_ok=True)
+    (submission / "formalization.yaml").write_text("name: imported\n", encoding="utf-8")
+    (submission / "Solution.lean").write_text(
+        "theorem imported_solution : True := by trivial\n", encoding="utf-8"
+    )
+
     assert discover_lean_sources(root) == ()
     assert stage_completion_issues("solve", root) == ()
+
+
+def test_a_project_authored_sources_directory_is_not_hidden(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    source = root / "research" / "sources" / "Main.lean"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("theorem own_source : True := by trivial\n", encoding="utf-8")
+
+    assert discover_lean_sources(root) == (source,)
+
+
+def test_a_project_authored_formal_directory_is_not_hidden(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    source = root / "research" / "formal" / "Solution.lean"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("theorem own_formal : True := by trivial\n", encoding="utf-8")
+    (source.parent / "formalization.yaml").write_text(
+        "name: project\n", encoding="utf-8"
+    )
+
+    assert discover_lean_sources(root) == (source,)
 
 
 # -- statement fidelity: the gate this wiring exists for --------------------

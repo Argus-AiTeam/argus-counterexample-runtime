@@ -70,6 +70,30 @@ class _Runner:
         )
 
 
+class _AdvanceRunner:
+    backend = None
+
+    def __init__(self, research_result: dict[str, Any]) -> None:
+        self.research_result = research_result
+
+    def execute(self, *, sink: Any, **kwargs: Any) -> _Outcome:
+        sink.handle_event({
+            "type": "round.review.completed",
+            "input_tokens": 500,
+            "cached_input_tokens": 0,
+            "output_tokens": 100,
+        })
+        return _Outcome(
+            research_result=self.research_result,
+            stage_transition={
+                "action": "advance",
+                "current_stage": "scope",
+                "target_stage": "solve",
+                "reason": "the current stage passed but the project continues",
+            },
+        )
+
+
 def _result(
     *,
     result_class: str = "structured_failure_report",
@@ -247,6 +271,33 @@ def test_genuine_success_settles_without_iteration(tmp_path: Path) -> None:
     stored = _stored(memory, item.id)
     assert stored.status == "done"
     assert stored.iteration_cycles_done == 0
+
+
+def test_nonterminal_stage_advance_cannot_certify_final_submission(
+    tmp_path: Path,
+) -> None:
+    result = _result(
+        result_class="verified_new_result",
+        novelty="verified_new",
+        significance="publishable",
+    )
+    supervisor, memory, item, sink, _project = _supervisor(tmp_path, result)
+    supervisor.runner = _AdvanceRunner(result)
+    supervisor.config.continuous = True
+
+    outcome = supervisor.tick()
+
+    assert outcome is not None
+    assert outcome["overall_complete"] is False
+    assert outcome["campaign_continues"] is True
+    stored = _stored(memory, item.id)
+    assert stored.status == "done"
+    completed = next(
+        event
+        for event in sink.events
+        if event.get("type") == "life.mission.completed"
+    )
+    assert completed["final_submission_certified"] is False
 
 
 def test_settlement_layer_imports_no_named_vertical() -> None:

@@ -968,5 +968,5 @@ def test_the_state_file_is_json_because_nothing_here_uses_a_database() -> None:
     state, _, claim = _seeded_state()
     state.add_evidence(_lean(claim))
     payload = json.loads(json.dumps(state.as_dict()))
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
     assert payload["claims"][0]["content_hash"] == claim.content_hash

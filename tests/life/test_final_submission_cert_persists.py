@@ -152,3 +152,22 @@ def test_project_signature_ignores_history_only_commits(tmp_path: Path):
     )
 
     assert build_project_state_signature(project_root=project) == before
+
+
+def test_project_signature_accepts_json_with_lone_surrogate(tmp_path: Path):
+    project = tmp_path / "project"
+    project.mkdir()
+    payload = project / "model-output.json"
+    payload.write_text(
+        json.dumps({"text": "\ud834", "label": "数学"}),
+        encoding="utf-8",
+    )
+
+    before = build_project_state_signature(project_root=project)
+    assert len(before) == 64
+
+    payload.write_text(
+        json.dumps({"text": "\ud835", "label": "数学"}),
+        encoding="utf-8",
+    )
+    assert build_project_state_signature(project_root=project) != before

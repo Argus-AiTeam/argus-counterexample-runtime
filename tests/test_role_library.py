@@ -145,7 +145,7 @@ def test_role_library_event_exposes_precedence_without_skill_content(
     result = role_skill_libraries(store, role="planner", on_event=events.append)
 
     assert result.own_paths == [store.skills_dir.resolve() / "planner"]
-    assert events[0]["precedence"] == "project,vertical,global"
+    assert events[0]["precedence"] == ["project", "vertical", "global"]
     assert events[0]["discovery"] == "native-or-path-fallback"
     assert "Skill body" not in str(events[0])
 

@@ -1077,11 +1077,19 @@ class MissionExecutionSettlementMixin:
             if state.intentional_abort
             else "mission_failed"
         )
+        stage_transition_present = bool(
+            isinstance(state.stage_transition, dict)
+            and state.stage_transition
+        )
+        project_completion_certified = bool(
+            not stage_transition_present or state.stage_action == "complete"
+        )
         final_submission_certified = bool(
             kind == "mission_complete"
             and state.iteration is None
             and state.item_scope == PLANNER_SCOPE_FINAL_SUBMISSION
             and getattr(outcome, "final_submission_certified", False)
+            and project_completion_certified
         )
         final_submission_signature = (
             self._final_submission_signature()

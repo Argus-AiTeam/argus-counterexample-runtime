@@ -76,12 +76,20 @@ def semantic_terminal_value(value: Any, *, field_name: str = "") -> Any:
 
 
 def _json_bytes(value: Any) -> bytes:
-    return json.dumps(
+    rendered = json.dumps(
         semantic_terminal_value(value),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
-    ).encode("utf-8")
+    )
+    try:
+        return rendered.encode("utf-8")
+    except UnicodeEncodeError:
+        # JSON permits escaped lone UTF-16 surrogate code points.  Python's
+        # decoder preserves them, but strict UTF-8 encoding rejects them.
+        # Keep normal fingerprints byte-for-byte unchanged and preserve the
+        # malformed code point only for the exceptional digest path.
+        return rendered.encode("utf-8", errors="surrogatepass")
 
 
 def _ignored_project_path(

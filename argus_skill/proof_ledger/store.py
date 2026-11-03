@@ -72,7 +72,7 @@ STATE_RELPATH = ("research", "MATH_STATE.json")
 
 #: Versions the *file*, never the digests inside it. Bumping this must stay
 #: able to leave every recorded proof valid; see ``models.content_digest``.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class MathStateError(Exception):

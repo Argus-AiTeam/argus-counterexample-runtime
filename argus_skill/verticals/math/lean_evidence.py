@@ -91,7 +91,9 @@ _VENDOR_DIR_NAMES = frozenset({
     ".git",
     ".hg",
     ".svn",
+    ".elan",
     ".lake",
+    "elan",
     "lake-packages",
     ".venv",
     "venv",
@@ -101,6 +103,14 @@ _VENDOR_DIR_NAMES = frozenset({
     ".pytest_cache",
     ".ruff_cache",
 })
+
+# Audit worktrees preserve third-party source snapshots, complete formal
+# reproduction checkouts, and imported formal-conjectures submission bundles.
+# They are evidence inputs, not claims made by the enclosing project. The
+# ``.work`` qualification and bundle marker checks are deliberate: ordinary
+# project-authored ``research/sources`` and ``research/formal`` directories
+# must still be discovered.
+_WORK_ARCHIVE_DIR_NAMES = frozenset({"formal-reproduction", "sources"})
 
 #: A project that trips this is pointing at a checkout rather than at its own
 #: work. Hitting it blocks: silently checking the first N of an unknown number
@@ -245,9 +255,18 @@ def _discover(project_root: Path) -> tuple[tuple[Path, ...], list[LeanIssue]]:
     ):
         keep: list[str] = []
         for name in sorted(dirnames):
-            if name in _VENDOR_DIR_NAMES:
-                continue
             directory = Path(current) / name
+            relative_parts = directory.relative_to(root).parts
+            formal_submission_bundle = (
+                ".work" in relative_parts
+                and name == "formal"
+                and (directory / "formalization.yaml").is_file()
+                and (directory / "Solution.lean").is_file()
+            )
+            if name in _VENDOR_DIR_NAMES or (
+                ".work" in relative_parts and name in _WORK_ARCHIVE_DIR_NAMES
+            ) or formal_submission_bundle:
+                continue
             if directory.is_symlink():
                 # Not followed, so its contents were never examined; claiming
                 # the project is clean would be claiming something unchecked.
