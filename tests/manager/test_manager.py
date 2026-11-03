@@ -150,6 +150,7 @@ def test_standalone_route_retries_project_domain_in_domain_field(
         "manager-classify-field-retry",
     ]
     assert "project domain" in runner.calls[1]["prompt"]
+    assert "RESEARCH_TARGET_LEVEL" in runner.calls[1]["prompt"]
 
 
 def test_direct_software_handoff_skips_duplicate_manager_grounding(
@@ -305,7 +306,10 @@ def test_manager_rejects_direct_alias_conflicting_with_persisted_staged_mode(
         "rationale": "bounded repair",
     })
 
-    with pytest.raises(VerticalDecisionError, match="could not decide"):
+    with pytest.raises(
+        VerticalDecisionError,
+        match=r"routing failed \[contract\]: workflow_mode got \"direct\"",
+    ):
         Manager(project_root=tmp_path, runner=runner).decide_vertical(
             "repair the repository"
         )

@@ -24,6 +24,17 @@ and unsupported interpretations before they enter downstream claims.
   report a fidelity failure and return it upstream; do not repair idea selection
   inside the experiment review.
 
+Before accepting any negative conclusion—method failure, route retirement, or
+“X does not work”—answer from evidence: Was the executed call chain faithful to
+the idea it claims to test? Did baselines and hyperparameters receive a competent,
+competitive effort? Could this scale and setup have revealed the effect if it
+existed? Have credible alternative explanations been excluded? If any answer is
+no, the honest status is “this idea has not yet been given a real chance”:
+unfinished work, not a negative result, paper section, or reason to abandon the
+route.
+
+Independently of whether the result is positive or negative, answer: What observed result or pattern most changed your belief — including a positive surprise — and what is the cheapest observation that would distinguish a new scientific explanation from an artifact? `none` is a valid answer and produces no work. If the answer could change the claim or route, use the ordinary `reconsider` channel to hand it to Planner; do not add a new output field.
+
 ## When the method did NOT beat the baseline
 
 A loss is a root-cause and research-value decision point.
@@ -75,6 +86,12 @@ not mean the frozen premise was supported. Report that separately as
    - Is uncertainty handled appropriately for the data-generating process and claim?
    - Are confidence intervals, repeated measurements, sensitivity analyses,
      formal guarantees, or other domain-appropriate support reported?
+   - Does every repeat have a named sampling-noise failure mode? Repeats detect
+     sampling noise and nothing else. When the margin is far from the noise
+     floor, one run suffices; near-noise margins retain the necessary repeats.
+     Repeats cannot validate an implementation, repair a broken control, or find
+     a claim-code mismatch. Require the cheaper faithfulness trace and positive
+     control first, and flag generalized-fear reruns as ritual waste.
    - Are small samples scoped honestly rather than rejected by a universal count?
    - Is the reported margin wider than the spread of this run's own repeats? A
      win inside your own noise is not a small win; it is not a measurement.

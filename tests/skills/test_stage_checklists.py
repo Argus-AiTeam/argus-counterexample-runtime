@@ -86,6 +86,18 @@ def test_bounded_reviewer_only_gates_on_mission_relevant_items() -> None:
     assert "research.literature" in text
 
 
+def test_bounded_reviewer_submission_stage_keeps_submission_markers() -> None:
+    text = format_stage_checklist("submission", role="reviewer", scope="bounded")
+
+    assert "## Stage checklist (submission)" in text
+    assert "Full pipeline checklist" not in text
+    assert "bounded mission" in text
+    assert "only the checklist items materially touched by this mission" in text
+    assert "submission.upstream" in text
+    assert "submission.anonymous" in text
+    assert "research.literature" not in text
+
+
 def test_plan_benchmark_checklist_supports_clinical_mechanism_projects() -> None:
     text = format_stage_checklist("plan", role="reviewer")
     assert "Clinical or mechanism projects" in text
@@ -189,14 +201,17 @@ def test_stage_checklist_completeness() -> None:
     draft_ids = {item.id for item in STAGE_CHECKLISTS["draft"]}
     assert "draft.pdf" in draft_ids
     assert "draft.bibliography" in draft_ids
+    assert "draft.research.method_faithfulness" in draft_ids
 
     review_ids = {item.id for item in STAGE_CHECKLISTS["review"]}
     assert "review.infrastructure" in review_ids
     assert "review.publication_value" in review_ids
+    assert "review.research.method_faithfulness" not in review_ids
 
     submission_ids = {item.id for item in STAGE_CHECKLISTS["submission"]}
     assert "submission.upstream" in submission_ids
     assert "submission.anonymous" in submission_ids
+    assert "submission.research.method_faithfulness" not in submission_ids
 
 
 def test_research_late_stages_accept_manager_selected_survey_shape() -> None:
@@ -591,9 +606,9 @@ def test_run_stage_checklist_has_generic_method_diagnosis_recall() -> None:
     assert "diagnosis" in statement.lower()
     assert "max_completion_length" not in statement
     assert "num_generations" not in statement
-    assert "under-engineered" in statement
+    assert "current evidence is discriminating enough" in statement
     assert "trusted reference" in statement
-    assert "fixed retry count" in statement
+    assert "every conceivable repair" in statement
 
 
 # --- RL plan-config sanity item --------------------------------------------
