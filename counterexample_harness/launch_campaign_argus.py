@@ -82,7 +82,10 @@ def main() -> None:
         workdir = ROOT / "campaigns" / campaign_id
         # Upgrade campaigns to the operator-requested publishable completion bar
         # while preserving doctoral if a campaign was already raised higher.
-        current_level = resolve_research_target_level(workdir)
+        current_level = (
+            os.environ.get("ARGUS_SKILL_RESEARCH_TARGET_LEVEL")
+            or resolve_research_target_level(workdir)
+        )
         target_level = "doctoral" if current_level == "doctoral" else "publishable"
         persist_vertical(
             workdir,
@@ -92,6 +95,8 @@ def main() -> None:
         )
         env = os.environ.copy()
         env.update(MODEL_ENV)
+        env["ARGUS_SKILL_RESEARCH_TARGET_LEVEL"] = target_level
+        env["ARGUS_SKILL_MATH_RESEARCH_TARGET_LEVEL"] = target_level
         campaign_model = (
             os.environ.get("ARGUS_CAMPAIGN_MODEL")
             or ("gpt-6-astra" if campaign_id in ASTRA_CAMPAIGN_IDS else DEFAULT_MODEL)
