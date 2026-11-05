@@ -106,6 +106,9 @@ _VENDOR_DIR_NAMES = frozenset({
     "tooling",
     ".tools",
     "pinned-env",
+    ".autors",
+    "shared_tools",
+    "openai_manuscript",
 })
 
 # Audit worktrees preserve third-party source snapshots, complete formal
