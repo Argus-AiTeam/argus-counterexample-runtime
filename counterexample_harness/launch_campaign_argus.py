@@ -151,6 +151,13 @@ def main() -> None:
                 workdir / ".autors" / campaign_id / "wiki",
                 dirs_exist_ok=True,
             )
+        shared_tools = ROOT.parent / ".argus-counterexamples" / "shared_tools"
+        if shared_tools.is_dir():
+            shutil.copytree(
+                shared_tools,
+                workdir / ".autors" / campaign_id / "tools",
+                dirs_exist_ok=True,
+            )
         env["ARGUS_SKILL_HOME"] = str(home_dir)
         env["ARGUS_SKILL_SPECIAL_PROMPTS_DIR"] = str(SPECIAL_PROMPTS)
         command = [str(ARGUS), "--daemon"]
