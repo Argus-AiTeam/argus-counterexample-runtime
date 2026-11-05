@@ -22,6 +22,7 @@ __all__ = [
     "shared_skills_archive_root",
     "reviewed_facts_digest_path",
     "tools_root",
+    "wiki_root",
     "capabilities_root",
     "special_prompts_root",
     "logs_root",
@@ -93,6 +94,10 @@ def reviewed_facts_digest_path(root: str | Path | None = None) -> Path:
 
 def tools_root(root: str | Path | None = None) -> Path:
     return _root(root) / "tools"
+
+
+def wiki_root(root: str | Path | None = None) -> Path:
+    return _root(root) / "wiki"
 
 
 def capabilities_root(root: str | Path | None = None) -> Path:

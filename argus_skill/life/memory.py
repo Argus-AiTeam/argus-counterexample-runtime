@@ -2679,12 +2679,14 @@ class GlobalMemory:
         from ..skills.builtins import (
             retire_orphaned_builtin_seeds,
             seed_builtin_skills,
+            seed_initial_evolution_library,
         )
 
         self.root.mkdir(parents=True, exist_ok=True)
         shared_skills = shared_skills_root(self.root)
         retire_orphaned_builtin_seeds(shared_skills)
         seed_builtin_skills(shared_skills)
+        seed_initial_evolution_library(self.root)
         return {
             "identity": self.identity.ensure_default(),
         }

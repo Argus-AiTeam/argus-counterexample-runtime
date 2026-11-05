@@ -128,6 +128,19 @@ class LifeWorkerBootMixin:
             # for the per-project harness overlay (.argus/harness/). The daemon
             # itself runs at cwd=/, so bare Path.cwd() would be wrong here.
             os.environ["ARGUS_SKILL_PROJECT_ROOT"] = str(self.config.project_workdir.resolve())
+            from ..core.paths import global_root
+            from ..skills.builtins import (
+                seed_initial_evolution_library,
+                sync_project_evolution_library,
+            )
+
+            _user_root = (
+                self.config.global_root.resolve()
+                if self.config.global_root is not None
+                else global_root()
+            )
+            seed_initial_evolution_library(_user_root)
+            sync_project_evolution_library(_user_root, self.config.project_workdir.resolve())
 
         # Strip the env-based ``GIT_CONFIG_*`` config-injection family from the
         # env handed to child codex shells. The codex sandbox forwards an

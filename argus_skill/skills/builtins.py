@@ -603,3 +603,107 @@ def _atomic_write_text(path: Path, text: str) -> None:
                 tmp.unlink()
             except OSError:
                 pass
+
+
+def _initial_seed_harness_root() -> Path:
+    return Path(__file__).resolve().parents[2] / "counterexample_harness"
+
+
+def _copy_missing_tree(src_dir: Path, dst_dir: Path) -> int:
+    if not src_dir.is_dir():
+        return 0
+    copied = 0
+    for root, _dirs, files in os.walk(src_dir):
+        rel_root = Path(root).relative_to(src_dir)
+        target_root = dst_dir / rel_root
+        target_root.mkdir(parents=True, exist_ok=True)
+        for fname in files:
+            src_file = Path(root) / fname
+            dst_file = target_root / fname
+            if not dst_file.exists():
+                try:
+                    _atomic_write_text(
+                        dst_file,
+                        src_file.read_text(encoding="utf-8", errors="ignore"),
+                    )
+                    copied += 1
+                except OSError:
+                    continue
+    return copied
+
+
+def seed_initial_evolution_library(global_root: Path) -> dict[str, int]:
+    """Idempotently seed a user's Argus home (``global_root``) with the common
+    initial 3-layer self-evolved library (``skills``, ``wiki``, ``tools``, and
+    ``reviewed-facts.md``) without overwriting user-evolved files.
+    """
+    from ..core.paths import (
+        reviewed_facts_digest_path,
+        shared_skills_root,
+        tools_root,
+        wiki_root,
+    )
+
+    global_root = Path(global_root)
+    harness = _initial_seed_harness_root()
+    skills_copied = _copy_missing_tree(
+        harness / "shared_skills",
+        shared_skills_root(global_root),
+    )
+    wiki_copied = _copy_missing_tree(
+        harness / "shared_wiki",
+        wiki_root(global_root),
+    )
+    tools_copied = _copy_missing_tree(
+        harness / "shared_tools",
+        tools_root(global_root),
+    )
+    rf_dst = reviewed_facts_digest_path(global_root)
+    rf_src = harness / "shared-reviewed-facts.md"
+    rf_seeded = 0
+    if rf_src.is_file() and (not rf_dst.exists() or rf_dst.stat().st_size == 0):
+        rf_dst.parent.mkdir(parents=True, exist_ok=True)
+        _atomic_write_text(rf_dst, rf_src.read_text(encoding="utf-8"))
+        rf_seeded = 1
+    return {
+        "skills": skills_copied,
+        "wiki": wiki_copied,
+        "tools": tools_copied,
+        "reviewed_facts": rf_seeded,
+    }
+
+
+def sync_project_evolution_library(
+    global_root: Path,
+    project_workdir: Path,
+) -> dict[str, int]:
+    """Two-way non-destructive sync between a user's Argus home (``global_root``)
+    and a project workdir's ``.autors/<slug>/{wiki,tools}``:
+    1. Any new wiki pages or tools evolved inside the project are promoted up
+       into the user's ``<global_root>/{wiki,tools}``.
+    2. All wiki pages and tools in the user's ``<global_root>/{wiki,tools}`` are
+       staged into the project workdir so every project on that user's Argus
+       shares and compounds the user's evolved library.
+    """
+    from ..core.paths import tools_root, wiki_root
+
+    global_root = Path(global_root)
+    project_workdir = Path(project_workdir)
+    slug = project_workdir.name
+    proj_autors = project_workdir / ".autors" / slug
+    proj_wiki = proj_autors / "wiki"
+    proj_tools = proj_autors / "tools"
+    user_wiki = wiki_root(global_root)
+    user_tools = tools_root(global_root)
+
+    up_wiki = _copy_missing_tree(proj_wiki, user_wiki)
+    up_tools = _copy_missing_tree(proj_tools, user_tools)
+    down_wiki = _copy_missing_tree(user_wiki, proj_wiki)
+    down_tools = _copy_missing_tree(user_tools, proj_tools)
+    return {
+        "promoted_wiki": up_wiki,
+        "promoted_tools": up_tools,
+        "staged_wiki": down_wiki,
+        "staged_tools": down_tools,
+    }
+
