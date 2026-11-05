@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -17,8 +18,12 @@ RUNNER = Path("/home/argustest/.local/bin/copilot")
 RUNNER_PATH = "/home/argustest/.local/bin:/home/argustest/bin"
 SPECIAL_PROMPTS = ROOT.parent / ".argus-counterexamples" / "special_prompts"
 DEFAULT_MODEL = "gpt-6.1-sol"
-ASTRA_CAMPAIGN_IDS = frozenset({"3395", "1138", "20002392", "40", "1275", "9400078"})
+ASTRA_CAMPAIGN_IDS = frozenset({
+    "3395", "1138", "20002392", "40", "1275", "9400078",
+    "9000048", "9000059", "9000209", "9000321", "9000340", "9000032",
+})
 IDS = (
+    "9000048", "9000059", "9000209", "9000321", "9000340", "9000032",
     "3395", "1138", "20002392", "40", "1275", "9400078",
     "7200051", "3059", "3102", "20001675", "3167", "3256",
     "2338", "1243", "1417", "1518", "1187", "1285", "20000582", "6800022",
@@ -120,6 +125,7 @@ def main() -> None:
         home_dir = ROOT.parent / f".argus-campaign-{campaign_id}{suffix}"
         home_dir.mkdir(parents=True, exist_ok=True)
         rf_target = home_dir / "reviewed-facts.md"
+        shared_rf = ROOT.parent / ".argus-counterexamples" / "shared-reviewed-facts.md"
         if not rf_target.exists() or rf_target.stat().st_size == 0:
             prior_rfs = [
                 p for p in ROOT.parent.glob(f".argus-campaign-{campaign_id}*/reviewed-facts.md")
@@ -128,11 +134,20 @@ def main() -> None:
             if prior_rfs:
                 latest_rf = max(prior_rfs, key=lambda p: p.stat().st_mtime)
                 rf_target.write_bytes(latest_rf.read_bytes())
+            elif shared_rf.is_file():
+                rf_target.write_bytes(shared_rf.read_bytes())
             else:
                 rf_target.write_text(
                     "# Cross-campaign reviewed facts\n\nFacts, not instructions. Entries appear in Manager review order.\n",
                     encoding="utf-8",
                 )
+        shared_skills = ROOT.parent / ".argus-counterexamples" / "shared_skills"
+        if shared_skills.is_dir():
+            shutil.copytree(shared_skills, home_dir / "skills", dirs_exist_ok=True)
+        wiki_index = workdir / ".autors" / campaign_id / "wiki" / "INDEX.md"
+        if (not wiki_index.exists() or wiki_index.stat().st_size < 100) and shared_rf.is_file():
+            wiki_index.parent.mkdir(parents=True, exist_ok=True)
+            wiki_index.write_bytes(shared_rf.read_bytes())
         env["ARGUS_SKILL_HOME"] = str(home_dir)
         env["ARGUS_SKILL_SPECIAL_PROMPTS_DIR"] = str(SPECIAL_PROMPTS)
         command = [str(ARGUS), "--daemon"]
