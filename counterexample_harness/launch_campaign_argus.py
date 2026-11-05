@@ -144,10 +144,13 @@ def main() -> None:
         shared_skills = ROOT.parent / ".argus-counterexamples" / "shared_skills"
         if shared_skills.is_dir():
             shutil.copytree(shared_skills, home_dir / "skills", dirs_exist_ok=True)
-        wiki_index = workdir / ".autors" / campaign_id / "wiki" / "INDEX.md"
-        if (not wiki_index.exists() or wiki_index.stat().st_size < 100) and shared_rf.is_file():
-            wiki_index.parent.mkdir(parents=True, exist_ok=True)
-            wiki_index.write_bytes(shared_rf.read_bytes())
+        shared_wiki = ROOT.parent / ".argus-counterexamples" / "shared_wiki"
+        if shared_wiki.is_dir():
+            shutil.copytree(
+                shared_wiki,
+                workdir / ".autors" / campaign_id / "wiki",
+                dirs_exist_ok=True,
+            )
         env["ARGUS_SKILL_HOME"] = str(home_dir)
         env["ARGUS_SKILL_SPECIAL_PROMPTS_DIR"] = str(SPECIAL_PROMPTS)
         command = [str(ARGUS), "--daemon"]
