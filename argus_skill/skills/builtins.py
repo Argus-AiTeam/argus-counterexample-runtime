@@ -609,15 +609,30 @@ def _initial_seed_harness_root() -> Path:
     return Path(__file__).resolve().parents[2] / "counterexample_harness"
 
 
+_SKIP_SYNC_DIRS = frozenset({
+    "ppt-master",
+    "node_modules",
+    ".venv",
+    "__pycache__",
+    ".git",
+    ".lake",
+    "pinned-env",
+    "toolchain",
+})
+
+
 def _copy_missing_tree(src_dir: Path, dst_dir: Path) -> int:
     if not src_dir.is_dir():
         return 0
     copied = 0
-    for root, _dirs, files in os.walk(src_dir):
+    for root, dirs, files in os.walk(src_dir):
+        dirs[:] = [d for d in dirs if d not in _SKIP_SYNC_DIRS]
         rel_root = Path(root).relative_to(src_dir)
         target_root = dst_dir / rel_root
         target_root.mkdir(parents=True, exist_ok=True)
         for fname in files:
+            if fname == "ppt-master.install.json":
+                continue
             src_file = Path(root) / fname
             dst_file = target_root / fname
             if not dst_file.exists():
