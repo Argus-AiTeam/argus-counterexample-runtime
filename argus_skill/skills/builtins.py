@@ -688,10 +688,15 @@ def seed_initial_evolution_library(global_root: Path) -> dict[str, int]:
     }
 
 
-def _harvest_verified_project_tools(project_workdir: Path, proj_tools: Path) -> int:
+def _harvest_verified_project_tools(
+    project_workdir: Path,
+    proj_tools: Path,
+    proj_wiki: Path | None = None,
+) -> int:
     """Automatically harvest kernel-verified Lean 4 proofs (``lean_check.json``
-    with ``status == "success"`` and empty ``proof_holes``) and Reviewer-supported
-    verification scripts from ``project_workdir / "research"`` into ``proj_tools``.
+    with ``status == "success"`` and empty ``proof_holes``), Reviewer-supported
+    verification scripts, and Reviewer-supported mathematical proof playbooks
+    from ``project_workdir / "research"`` into ``proj_tools`` and ``proj_wiki``.
     """
     research_dir = project_workdir / "research"
     if not research_dir.is_dir():
@@ -714,7 +719,7 @@ def _harvest_verified_project_tools(project_workdir: Path, proj_tools: Path) -> 
             and not lc.get("proof_holes")
         ):
             for lean_file in lc_path.parent.glob("*.lean"):
-                dst = dest_base / lean_file.name
+                dst = dest_base / f"{lean_file.name}.template"
                 if not dst.exists():
                     dst.parent.mkdir(parents=True, exist_ok=True)
                     _atomic_write_text(
@@ -723,7 +728,7 @@ def _harvest_verified_project_tools(project_workdir: Path, proj_tools: Path) -> 
                     )
                     harvested += 1
 
-    # 2. Harvest Reviewer-supported verification scripts recorded in MATH_STATE.json
+    # 2. Harvest Reviewer-supported verification scripts & proof playbooks recorded in MATH_STATE.json
     ms_path = research_dir / "MATH_STATE.json"
     if ms_path.is_file():
         try:
@@ -732,17 +737,28 @@ def _harvest_verified_project_tools(project_workdir: Path, proj_tools: Path) -> 
                 if ev.get("verdict") != "supports":
                     continue
                 art = str(ev.get("artifact") or "").strip()
+                src = project_workdir / art
+                if not src.is_file() or src.stat().st_size >= 250_000:
+                    continue
                 if art.endswith((".py", ".lean", ".cpp", ".gp", ".sage")):
-                    src = project_workdir / art
-                    if src.is_file() and src.stat().st_size < 200_000:
-                        dst = dest_base / src.name
-                        if not dst.exists():
-                            dst.parent.mkdir(parents=True, exist_ok=True)
-                            _atomic_write_text(
-                                dst,
-                                src.read_text(encoding="utf-8", errors="ignore"),
-                            )
-                            harvested += 1
+                    dst_name = f"{src.name}.template" if art.endswith(".lean") else src.name
+                    dst = dest_base / dst_name
+                    if not dst.exists():
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        _atomic_write_text(
+                            dst,
+                            src.read_text(encoding="utf-8", errors="ignore"),
+                        )
+                        harvested += 1
+                elif proj_wiki is not None and art.endswith((".md", ".tex")) and "literature" not in art:
+                    wiki_dst = proj_wiki / "pages" / f"c{slug}" / f"{src.parent.name}_{src.stem}.md"
+                    if not wiki_dst.exists():
+                        wiki_dst.parent.mkdir(parents=True, exist_ok=True)
+                        _atomic_write_text(
+                            wiki_dst,
+                            src.read_text(encoding="utf-8", errors="ignore"),
+                        )
+                        harvested += 1
         except (OSError, ValueError):
             pass
 
@@ -774,7 +790,7 @@ def sync_project_evolution_library(
     user_wiki = wiki_root(global_root)
     user_tools = tools_root(global_root)
 
-    harvested = _harvest_verified_project_tools(project_workdir, proj_tools)
+    harvested = _harvest_verified_project_tools(project_workdir, proj_tools, proj_wiki)
     up_wiki = _copy_missing_tree(proj_wiki, user_wiki)
     up_tools = _copy_missing_tree(proj_tools, user_tools)
     down_wiki = _copy_missing_tree(user_wiki, proj_wiki)
