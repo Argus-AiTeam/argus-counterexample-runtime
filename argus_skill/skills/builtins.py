@@ -688,17 +688,80 @@ def seed_initial_evolution_library(global_root: Path) -> dict[str, int]:
     }
 
 
+def _harvest_verified_project_tools(project_workdir: Path, proj_tools: Path) -> int:
+    """Automatically harvest kernel-verified Lean 4 proofs (``lean_check.json``
+    with ``status == "success"`` and empty ``proof_holes``) and Reviewer-supported
+    verification scripts from ``project_workdir / "research"`` into ``proj_tools``.
+    """
+    research_dir = project_workdir / "research"
+    if not research_dir.is_dir():
+        return 0
+    slug = project_workdir.name
+    dest_base = proj_tools / "results_tools" / f"c{slug}"
+    harvested = 0
+
+    # 1. Harvest kernel-verified Lean 4 sources
+    for lc_path in research_dir.rglob("lean_check.json"):
+        if any(part in _SKIP_SYNC_DIRS or part in {".autors", "openai_manuscript"} for part in lc_path.parts):
+            continue
+        try:
+            lc = json.loads(lc_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if (
+            lc.get("status") == "success"
+            and lc.get("exit_code") == 0
+            and not lc.get("proof_holes")
+        ):
+            for lean_file in lc_path.parent.glob("*.lean"):
+                dst = dest_base / lean_file.name
+                if not dst.exists():
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    _atomic_write_text(
+                        dst,
+                        lean_file.read_text(encoding="utf-8", errors="ignore"),
+                    )
+                    harvested += 1
+
+    # 2. Harvest Reviewer-supported verification scripts recorded in MATH_STATE.json
+    ms_path = research_dir / "MATH_STATE.json"
+    if ms_path.is_file():
+        try:
+            ms = json.loads(ms_path.read_text(encoding="utf-8"))
+            for ev in ms.get("evidence", ()):
+                if ev.get("verdict") != "supports":
+                    continue
+                art = str(ev.get("artifact") or "").strip()
+                if art.endswith((".py", ".lean", ".cpp", ".gp", ".sage")):
+                    src = project_workdir / art
+                    if src.is_file() and src.stat().st_size < 200_000:
+                        dst = dest_base / src.name
+                        if not dst.exists():
+                            dst.parent.mkdir(parents=True, exist_ok=True)
+                            _atomic_write_text(
+                                dst,
+                                src.read_text(encoding="utf-8", errors="ignore"),
+                            )
+                            harvested += 1
+        except (OSError, ValueError):
+            pass
+
+    return harvested
+
+
 def sync_project_evolution_library(
     global_root: Path,
     project_workdir: Path,
 ) -> dict[str, int]:
     """Two-way non-destructive sync between a user's Argus home (``global_root``)
     and a project workdir's ``.autors/<slug>/{wiki,tools}``:
-    1. Any new wiki pages or tools evolved inside the project are promoted up
-       into the user's ``<global_root>/{wiki,tools}``.
-    2. All wiki pages and tools in the user's ``<global_root>/{wiki,tools}`` are
-       staged into the project workdir so every project on that user's Argus
-       shares and compounds the user's evolved library.
+    1. Automatically harvest any newly verified Lean 4 proofs or Reviewer-supported
+       verifier scripts from ``project_workdir/research/`` into ``.autors/<slug>/tools/``.
+    2. Promote any new wiki pages or tools evolved inside the project up into
+       the user's ``<global_root>/{wiki,tools}``.
+    3. Stage all wiki pages and tools in the user's ``<global_root>/{wiki,tools}``
+       into the project workdir so every project on that user's Argus shares and
+       compounds the user's evolved library.
     """
     from ..core.paths import tools_root, wiki_root
 
@@ -711,11 +774,13 @@ def sync_project_evolution_library(
     user_wiki = wiki_root(global_root)
     user_tools = tools_root(global_root)
 
+    harvested = _harvest_verified_project_tools(project_workdir, proj_tools)
     up_wiki = _copy_missing_tree(proj_wiki, user_wiki)
     up_tools = _copy_missing_tree(proj_tools, user_tools)
     down_wiki = _copy_missing_tree(user_wiki, proj_wiki)
     down_tools = _copy_missing_tree(user_tools, proj_tools)
     return {
+        "harvested_tools": harvested,
         "promoted_wiki": up_wiki,
         "promoted_tools": up_tools,
         "staged_wiki": down_wiki,

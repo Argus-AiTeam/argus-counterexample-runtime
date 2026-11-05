@@ -114,6 +114,16 @@ class EvolutionMixin:
                 )
             if any(counts.values()):
                 log.info("manager skill propagation after mission: %s", counts)
+            try:
+                from ...skills.builtins import sync_project_evolution_library
+
+                evo_counts = sync_project_evolution_library(
+                    self._budget_global_root(),
+                    Path(source_campaign or self._project_workdir()),
+                )
+                counts.update(evo_counts)
+            except Exception:  # noqa: BLE001
+                log.warning("3-layer evolution library sync after mission failed", exc_info=True)
             return counts
         except Exception:  # noqa: BLE001 - evolution must never change verdict
             log.warning("manager Skill propagation after mission failed", exc_info=True)

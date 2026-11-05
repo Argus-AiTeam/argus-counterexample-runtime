@@ -1249,6 +1249,18 @@ def verify_lean_source(
             root / COMPILE_LOG,
             render_compile_log(result).encode("utf-8"),
         )
+    if (
+        result.get("status") == "success"
+        and result.get("exit_code") == 0
+        and not result.get("proof_holes")
+    ):
+        try:
+            from ...core.paths import global_root
+            from ...skills.builtins import sync_project_evolution_library
+
+            sync_project_evolution_library(global_root(), project_root)
+        except Exception:  # noqa: BLE001
+            pass
     return result
 
 
