@@ -8,6 +8,7 @@ from counterexample_harness.reopen_openai_audit import (
     audit_objective,
     describe_sources,
     parse_manuscripts,
+    write_audit_instructions,
 )
 
 
@@ -73,7 +74,7 @@ def test_withdrawn_snapshot_restores_archived_source_without_changing_notice(tmp
     assert len(calls) == 1
 
 
-def test_objective_requires_all_papers_without_prejudging_their_mathematics(tmp_path):
+def test_local_lemma_refutation_suffices_without_full_paper_certification(tmp_path):
     manifest = {
         "upstream_commit": "revision",
         "manuscripts": [
@@ -82,6 +83,20 @@ def test_objective_requires_all_papers_without_prejudging_their_mathematics(tmp_
         ],
     }
     objective = audit_objective(manifest, tmp_path / "old")
-    assert "first/report.md" in objective and "second/report.md" in objective
-    assert "not production of a publishable new theorem" in objective
-    assert "unresolved assessment is not proof" in objective
+    assert "MANUSCRIPTS.json" in objective
+    assert "full-paper proof or review is NOT required" in objective
+    assert "One independently confirmed counterexample" in objective
+    assert "not a clean bill of health" in objective
+    assert "all original hypotheses" in objective
+
+
+def test_refresh_instructions_does_not_change_sources_or_research(tmp_path):
+    research = tmp_path / "research"
+    research.mkdir()
+    (research / "proof.md").write_text("accepted original proof")
+    (tmp_path / "MANUSCRIPTS.json").write_text("preserved source manifest")
+    write_audit_instructions(tmp_path, {"upstream_commit": "revision"}, None)
+    assert (research / "proof.md").read_text() == "accepted original proof"
+    assert (tmp_path / "MANUSCRIPTS.json").read_text() == "preserved source manifest"
+    assert "sole task contract" in (tmp_path / "AGENTS.md").read_text()
+    assert "full-paper certification" in (tmp_path / "LAUNCH.md").read_text()

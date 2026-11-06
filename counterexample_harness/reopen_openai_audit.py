@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -17,8 +18,10 @@ from pathlib import Path
 
 REVISION = "4eaee87548250b2682affda7d05d947c05554bae"
 PRE_WITHDRAWAL_REVISION = "adc7f1241b42e322a6451854ab7e4b4c146bf78a"
-AUDIT_DIR = Path("/home/argustest/zimo/openai-math-audit")
-BATCH_ROOT = Path("/home/argustest/zimo/counterexample-batch-1")
+WORKSPACE = Path(os.environ.get("ARGUS_AUDIT_WORKSPACE", Path.home() / "zimo"))
+AUDIT_DIR = WORKSPACE / "openai-math-audit"
+BATCH_ROOT = WORKSPACE / "counterexample-batch-1"
+OBJECTIVE_TEMPLATE = Path(__file__).with_name("openai_audit_objective.md")
 WITHDRAWN = (
     "Algebraicity-of-Weil-classes-on-split-abelian-eightfolds-September-18-2026",
     "Algebraicity-of-Kuga-Satake-Correspondences-for-K3-Surfaces-October-3-2026",
@@ -92,70 +95,28 @@ def withdrawn_snapshot(source_repo: Path, audit_dir: Path, slug: str) -> Path:
 
 def audit_objective(manifest: dict, prior: Path | None) -> str:
     prior_text = (
-        f"Prior work is available read-only at `{prior}`. Preserve and reuse valid results, "
-        "but independently check their exact scope, source attribution and review records."
+        f"Reuse prior work read-only at `{prior}`, after checking its source and scope."
         if prior else
-        "This is an upstream withdrawal audit; distinguish the official withdrawal from any new finding."
+        "Distinguish the upstream withdrawal and its archived proof from new findings."
     )
-    papers = "\n".join(
-        f"- `{p['manuscript_id']}`: `{p['report']}` and `{p['verdict']}`"
-        for p in manifest["manuscripts"]
+    return OBJECTIVE_TEMPLATE.read_text().format(
+        revision=manifest["upstream_commit"], prior=prior_text,
     )
-    return f"""# Source-pinned per-manuscript audit continuation
 
-Audit EVERY manuscript in `MANUSCRIPTS.json` at upstream commit `{manifest['upstream_commit']}`.
-The task is exhaustive critical review, not production of a publishable new theorem.
-Neither correctness nor incorrectness of the manuscripts is assumed.
-{prior_text}
 
-## Required manuscript-specific outputs
-
-{papers}
-
-For EACH manuscript, read its entire proof and make a source-located dependency map.
-The report must identify the exact title/version, headline claims, load-bearing lemmas,
-external inputs, what was actually checked, supporting computations and all remaining
-unresolved steps. A report for one manuscript or one local lemma does not cover its
-companions. Prior local certificates may be reused with their original boundaries.
-Inspect companion dependencies, but report every listed manuscript separately.
-
-Actively try to falsify the actual claims: boundary and degenerate cases, quantifier
-order, signs, rank, compactness, limiting arguments, external theorem hypotheses,
-and omitted global-to-local or local-to-global bridges. Try admissible counterexamples
-and exact symbolic checks. Do not treat inability to prove a claim as a refutation.
-Do not treat normal literature citations, hypothetical counterexamples outside the
-hypotheses, a failed strengthening, or a partial Lean proof as an original-paper error.
-
-For each alleged flaw, quote a short exact assertion and locator, list ALL original
-hypotheses, exhibit the contradiction or missing inference, test the strongest
-reasonable alternative interpretation/repair, and explain precisely which downstream
-claims are affected. Separate a false theorem, an invalid proof step, an ambiguous
-scope, a citation-number erratum and an external-literature issue. Credit upstream
-constructions and prior results. Kernel compilation certifies only its actual statement.
-New Lean is useful only when it formalizes a substantive relevant step; do not pad
-the evidence with toy analogies or unrelated identities.
-
-Each `verdict.json` must name its manuscript, source revision, reviewed scope,
-headline-claim assessment, findings, evidence and unresolved items. A supported
-finding requires independent Host-invoked Reviewer assessment. Do not forge a
-Reviewer identity or self-certify. If a global step remains genuinely unresolved,
-state it explicitly with its precise blocker, checks attempted and remaining burden.
-An unresolved assessment is not proof that the manuscript is wrong or correct.
-
-## Whole-project completion
-
-Use the native staged math workflow at research_target_level=exploratory.
-The independent Reviewer, not the queue scheduler, judges the mathematics and whether
-every listed manuscript has been adequately audited. All listed reports and their
-individual assessments must be reviewed before final project completion. Merely
-finishing one mission, collecting evidence records, or proving a local theorem is
-not completion of this project. A source access problem, resource stop or budget
-limit is incomplete/blocked, never a successful full audit.
-
-Keep all prior reports, proofs, certificates, source documents and logs. Write new
-work only inside this continuation directory. Invoke every argus_skill module with
-`/home/argustest/zimo/argus-latest/.venv/bin/python`, never bare Python.
-"""
+def write_audit_instructions(workdir: Path, manifest: dict, prior: Path | None) -> None:
+    (workdir / "OBJECTIVE.md").write_text(audit_objective(manifest, prior))
+    (workdir / "AGENTS.md").write_text(
+        "# Audit execution\n\nRead OBJECTIVE.md for the sole task contract and "
+        "MANUSCRIPTS.json for sources and output paths. Preserve old drafts. "
+        f"Invoke Argus modules with `{WORKSPACE / 'argus-latest/.venv/bin/python'}`.\n"
+    )
+    (workdir / "LAUNCH.md").write_text(
+        "Use staged math, research_target_level=exploratory. "
+        "EXECUTION_TASK: Follow OBJECTIVE.md and MANUSCRIPTS.json. "
+        "Seek a source-bound erroneous lemma, not full-paper certification. "
+        "The native independent Reviewer judges the result.\n"
+    )
 
 
 def materialize(source_repo: Path, batch_root: Path, audit_dir: Path, revision: str) -> dict:
@@ -209,24 +170,7 @@ def materialize(source_repo: Path, batch_root: Path, audit_dir: Path, revision: 
                     paper["source_directory"], target_is_directory=True
                 )
             manifest_path.write_text(manifest_text)
-            (workdir / "OBJECTIVE.md").write_text(audit_objective(manifest, old))
-            (workdir / "AGENTS.md").write_text(
-                "# Per-manuscript audit continuation\n\n"
-                "Read OBJECTIVE.md and MANUSCRIPTS.json. Preserve all earlier drafts. "
-                "Review every listed manuscript independently. Use the native Host-invoked "
-                "Reviewer; never self-certify or manufacture refutation labels. "
-                "Do not replace unresolved mathematics by toy Lean declarations. "
-                "Use /home/argustest/zimo/argus-latest/.venv/bin/python for Argus modules.\n"
-            )
-            (workdir / "LAUNCH.md").write_text(
-                "Route this continuation to the staged math workflow at "
-                "research_target_level=exploratory, math_objective_mode=exploratory.\n"
-                "The Manager EXECUTION_TASK must be: read OBJECTIVE.md and MANUSCRIPTS.json "
-                "and critically audit EVERY listed manuscript, preserving prior work. "
-                "Produce separate source-bound reports and assessments for all listed papers. "
-                "A local result is not whole-project completion. Only the native independent "
-                "Reviewer can accept the full coverage and its mathematical conclusions.\n"
-            )
+            write_audit_instructions(workdir, manifest, old)
             (workdir / "campaign.json").write_text(json.dumps({
                 "id": cid, "family": family, "research_target_level": "exploratory",
                 "math_objective_mode": "exploratory", "model": "gpt-6.1-sol",
@@ -272,7 +216,17 @@ def main() -> None:
     parser.add_argument("--batch-root", type=Path, default=BATCH_ROOT)
     parser.add_argument("--audit-dir", type=Path, default=AUDIT_DIR)
     parser.add_argument("--revision", default=REVISION)
+    parser.add_argument("--refresh-instructions", action="store_true")
     args = parser.parse_args()
+    if args.refresh_instructions:
+        queue = json.loads((args.audit_dir / "openai_373_queue.json").read_text())
+        for item in queue:
+            workdir = args.batch_root / "campaigns" / item["campaign_id"]
+            manifest = json.loads((workdir / "MANUSCRIPTS.json").read_text())
+            prior = manifest.get("previous_campaign")
+            write_audit_instructions(workdir, manifest, Path(prior) if prior else None)
+        print(json.dumps({"instructions_refreshed": len(queue)}))
+        return
     print(json.dumps(materialize(
         args.source_repo, args.batch_root, args.audit_dir, args.revision
     ), indent=2))

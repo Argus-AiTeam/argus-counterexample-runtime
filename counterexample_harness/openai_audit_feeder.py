@@ -11,10 +11,10 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-AUDIT_DIR = Path("/home/argustest/zimo/openai-math-audit")
-BATCH_ROOT = Path("/home/argustest/zimo/counterexample-batch-1")
-ZIMO = Path("/home/argustest/zimo")
-PYTHON_BIN = "/home/argustest/zimo/argus-latest/.venv/bin/python"
+ZIMO = Path(os.environ.get("ARGUS_AUDIT_WORKSPACE", Path.home() / "zimo"))
+AUDIT_DIR = ZIMO / "openai-math-audit"
+BATCH_ROOT = ZIMO / "counterexample-batch-1"
+PYTHON_BIN = str(ZIMO / "argus-latest/.venv/bin/python")
 LAUNCH_SCRIPT = str(BATCH_ROOT / "scripts" / "launch_campaign_argus.py")
 QUEUE_PATH = AUDIT_DIR / "openai_373_queue.json"
 STATE_PATH = AUDIT_DIR / "fleet_state.json"
@@ -23,7 +23,7 @@ TARGET_CONCURRENCY = 24
 from argus_skill.skills.builtins import sync_project_evolution_library
 from argus_skill.skills.vertical_select import vertical_completion_certificate_status
 
-MASTER_HOME = Path("/home/argustest/.argus-skill")
+MASTER_HOME = Path.home() / ".argus-skill"
 
 
 def get_daemon_pid(cid: str) -> int | None:
@@ -51,11 +51,8 @@ def get_daemon_pid(cid: str) -> int | None:
 
 
 def is_campaign_finished(cid: str) -> bool:
-    try:
-        result = vertical_completion_certificate_status(BATCH_ROOT / "campaigns" / cid, "math")
-        return result.get("ok") is True
-    except Exception:
-        return False
+    result = vertical_completion_certificate_status(BATCH_ROOT / "campaigns" / cid, "math")
+    return result.get("ok") is True
 
 
 def tick() -> dict:
