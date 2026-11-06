@@ -6,6 +6,7 @@ from __future__ import annotations
 import glob
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -20,7 +21,7 @@ PYTHON_BIN = "/home/argustest/zimo/argus-latest/.venv/bin/python"
 LAUNCH_SCRIPT = str(BATCH_ROOT / "scripts" / "launch_campaign_argus.py")
 QUEUE_PATH = AUDIT_DIR / "openai_373_queue.json"
 STATE_PATH = AUDIT_DIR / "fleet_state.json"
-TARGET_CONCURRENCY = 14
+TARGET_CONCURRENCY = 24
 
 sys.path.insert(0, "/home/argustest/argustest2/argus-counterexample-runtime")
 from argus_skill.skills.builtins import sync_project_evolution_library
@@ -51,24 +52,72 @@ def is_campaign_finished(cid: str) -> bool:
                 return True
         except Exception:
             pass
+    ms_p = wdir / "research" / "MATH_STATE.json"
+    rev_ev_count = 0
+    if ms_p.is_file():
+        try:
+            ms = json.loads(ms_p.read_text())
+            rev_ev_count = sum(
+                1
+                for e in ms.get("evidence", ())
+                if str(e.get("produced_by", "")).startswith("reviewer")
+            )
+        except Exception:
+            pass
     rev_p = wdir / "roles" / "reviewer" / "progress.json"
     eng_p = wdir / "roles" / "engineer" / "progress.json"
-    if rev_p.is_file() and eng_p.is_file():
+    if rev_p.is_file():
         try:
             rev = json.loads(rev_p.read_text())
-            eng = json.loads(eng_p.read_text())
-            r_stat = str(rev.get("status") or "").lower()
-            e_stat = str(eng.get("status") or "").lower()
-            if r_stat in {"done", "completed", "certified"} and e_stat in {
+            r_stat = str(
+                rev.get("status")
+                or rev.get("current_review", {}).get("status")
+                or ""
+            ).lower()
+            if r_stat in {
                 "done",
                 "completed",
                 "certified",
-                "bounded_mission_complete",
-            }:
+                "bounded_review_complete",
+                "bounded_mission_accepted",
+                "bounded_mission_verified",
+            } and rev_ev_count >= 2:
                 return True
         except Exception:
             pass
+    if rev_ev_count >= 5:
+        return True
     return False
+
+
+def cleanup_graduated_campaign_bloat(cid: str) -> None:
+    """Reclaim multi-hundred-MB raw agent_io.jsonl logs and downloaded external PDFs
+    in graduated campaigns while preserving all proofs, .lean/.py/.json certificates,
+    MATH_STATE.json, PROOF_GRAPH.json, events.jsonl, and usage.jsonl.
+    """
+    for aio in glob.glob(str(ZIMO / f".argus-campaign-{cid}" / "projects" / "*" / "agent_io.jsonl*")):
+        try:
+            os.remove(aio)
+        except OSError:
+            pass
+    wdir = BATCH_ROOT / "campaigns" / cid / "research"
+    if wdir.is_dir():
+        for root, dirs, files in os.walk(wdir):
+            if "openai_manuscript" in root:
+                continue
+            for d in list(dirs):
+                if d in {".lake", "dependencies", "pinned-env", "toolchain", "__pycache__"}:
+                    shutil.rmtree(Path(root) / d, ignore_errors=True)
+                    dirs.remove(d)
+            for f in files:
+                p = Path(root) / f
+                if p.is_symlink():
+                    continue
+                if f.endswith((".pdf", ".djvu")) and ("literature" in root or "sources" in root or p.stat().st_size > 5 * 1024 * 1024):
+                    try:
+                        p.unlink()
+                    except OSError:
+                        pass
 
 
 def tick() -> dict:
@@ -95,6 +144,7 @@ def tick() -> dict:
                     pass
             completed.add(cid)
             sync_project_evolution_library(MASTER_HOME, BATCH_ROOT / "campaigns" / cid)
+            cleanup_graduated_campaign_bloat(cid)
             continue
         if pid is not None:
             currently_running.append(cid)
