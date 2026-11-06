@@ -10,7 +10,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 ARGUS = ROOT.parent / "argus-live-update" / ".venv" / "bin" / "argus"
 ARGUS_BIN = ARGUS.parent
@@ -64,9 +63,20 @@ MODEL_ENV = {
 }
 
 
+def campaign_research_target_level(workdir: Path) -> str:
+    from argus_skill.core.research_contract import (
+        research_target_env_override,
+        resolve_research_target_level,
+    )
+
+    override = research_target_env_override()
+    if override is not None:
+        return override
+    return "doctoral" if resolve_research_target_level(workdir) == "doctoral" else "publishable"
+
+
 def main() -> None:
     sys.path.insert(0, str(ROOT.parent / "argus-live-update"))
-    from argus_skill.core.research_contract import resolve_research_target_level
     from argus_skill.skills.vertical_select import persist_vertical
 
     selected = tuple(sys.argv[1:]) or IDS
@@ -80,13 +90,7 @@ def main() -> None:
     failed = False
     for campaign_id in selected:
         workdir = ROOT / "campaigns" / campaign_id
-        # Upgrade campaigns to the operator-requested publishable completion bar
-        # while preserving doctoral if a campaign was already raised higher.
-        current_level = (
-            os.environ.get("ARGUS_SKILL_RESEARCH_TARGET_LEVEL")
-            or resolve_research_target_level(workdir)
-        )
-        target_level = "doctoral" if current_level == "doctoral" else "publishable"
+        target_level = campaign_research_target_level(workdir)
         persist_vertical(
             workdir,
             "math",

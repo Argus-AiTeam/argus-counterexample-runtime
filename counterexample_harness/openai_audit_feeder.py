@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Maintain 14 concurrent Argus daemons (gpt-6.1-sol) across all 373 OpenAI families."""
+"""Schedule manuscript audits using native completion certificates, not evidence counts."""
 
 from __future__ import annotations
 
-import glob
 import json
 import os
-import shutil
-import signal
 import subprocess
 import sys
 import time
@@ -23,101 +20,42 @@ QUEUE_PATH = AUDIT_DIR / "openai_373_queue.json"
 STATE_PATH = AUDIT_DIR / "fleet_state.json"
 TARGET_CONCURRENCY = 24
 
-sys.path.insert(0, "/home/argustest/argustest2/argus-counterexample-runtime")
 from argus_skill.skills.builtins import sync_project_evolution_library
+from argus_skill.skills.vertical_select import vertical_completion_certificate_status
 
 MASTER_HOME = Path("/home/argustest/.argus-skill")
 
 
 def get_daemon_pid(cid: str) -> int | None:
-    pfiles = sorted(glob.glob(str(ZIMO / f".argus-campaign-{cid}" / "projects" / "*" / "daemon.pid")))
-    if not pfiles:
-        return None
-    try:
-        pid = int(Path(pfiles[-1]).read_text().strip())
-        if os.path.exists(f"/proc/{pid}"):
-            return pid
-    except Exception:
-        return None
+    home = ZIMO / f".argus-campaign-{cid}"
+    pfiles = sorted(
+        (home / "projects").glob("*/daemon.pid"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    for path in pfiles:
+        try:
+            pid = int(path.read_text().strip())
+            command = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+            environment = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+            if (
+                pid > 0
+                and b"--daemon" in command
+                and any(Path(os.fsdecode(arg)).name in {"argus", "argus-skill"} for arg in command)
+                and os.fsencode(f"ARGUS_SKILL_HOME={home}") in environment
+            ):
+                return pid
+        except (OSError, ValueError):
+            continue
     return None
 
 
 def is_campaign_finished(cid: str) -> bool:
-    wdir = BATCH_ROOT / "campaigns" / cid
-    pipe_p = wdir / ".argus" / "PIPELINE_STATE.json"
-    if pipe_p.is_file():
-        try:
-            pipe = json.loads(pipe_p.read_text())
-            if pipe.get("completed") is True or pipe.get("current_stage") == "complete":
-                return True
-        except Exception:
-            pass
-    ms_p = wdir / "research" / "MATH_STATE.json"
-    rev_ev_count = 0
-    if ms_p.is_file():
-        try:
-            ms = json.loads(ms_p.read_text())
-            rev_ev_count = sum(
-                1
-                for e in ms.get("evidence", ())
-                if str(e.get("produced_by", "")).startswith("reviewer")
-            )
-        except Exception:
-            pass
-    rev_p = wdir / "roles" / "reviewer" / "progress.json"
-    eng_p = wdir / "roles" / "engineer" / "progress.json"
-    if rev_p.is_file():
-        try:
-            rev = json.loads(rev_p.read_text())
-            r_stat = str(
-                rev.get("status")
-                or rev.get("current_review", {}).get("status")
-                or ""
-            ).lower()
-            if r_stat in {
-                "done",
-                "completed",
-                "certified",
-                "bounded_review_complete",
-                "bounded_mission_accepted",
-                "bounded_mission_verified",
-            } and rev_ev_count >= 2:
-                return True
-        except Exception:
-            pass
-    if rev_ev_count >= 5:
-        return True
-    return False
-
-
-def cleanup_graduated_campaign_bloat(cid: str) -> None:
-    """Reclaim multi-hundred-MB raw agent_io.jsonl logs and downloaded external PDFs
-    in graduated campaigns while preserving all proofs, .lean/.py/.json certificates,
-    MATH_STATE.json, PROOF_GRAPH.json, events.jsonl, and usage.jsonl.
-    """
-    for aio in glob.glob(str(ZIMO / f".argus-campaign-{cid}" / "projects" / "*" / "agent_io.jsonl*")):
-        try:
-            os.remove(aio)
-        except OSError:
-            pass
-    wdir = BATCH_ROOT / "campaigns" / cid / "research"
-    if wdir.is_dir():
-        for root, dirs, files in os.walk(wdir):
-            if "openai_manuscript" in root:
-                continue
-            for d in list(dirs):
-                if d in {".lake", "dependencies", "pinned-env", "toolchain", "__pycache__"}:
-                    shutil.rmtree(Path(root) / d, ignore_errors=True)
-                    dirs.remove(d)
-            for f in files:
-                p = Path(root) / f
-                if p.is_symlink():
-                    continue
-                if f.endswith((".pdf", ".djvu")) and ("literature" in root or "sources" in root or p.stat().st_size > 5 * 1024 * 1024):
-                    try:
-                        p.unlink()
-                    except OSError:
-                        pass
+    try:
+        result = vertical_completion_certificate_status(BATCH_ROOT / "campaigns" / cid, "math")
+        return result.get("ok") is True
+    except Exception:
+        return False
 
 
 def tick() -> dict:
@@ -125,46 +63,30 @@ def tick() -> dict:
     state = (
         json.loads(STATE_PATH.read_text())
         if STATE_PATH.is_file()
-        else {"completed": ["9000321"], "active": [], "launched_history": ["9000048", "9000059", "9000209", "9000321", "9000340", "9000032", "9000201", "9000053", "9000319", "9000046", "9000285", "9000063", "9000366", "9000067", "9000031"]}
+        else {"completed": [], "active": [], "launched_history": []}
     )
-    completed = set(state.get("completed", []))
+    campaign_ids = {item["campaign_id"] for item in queue}
+    completed = {
+        cid for cid in state.get("completed", [])
+        if cid in campaign_ids and is_campaign_finished(cid)
+    }
     launched_history = list(dict.fromkeys(state.get("launched_history", [])))
 
-    # 1. Check all launched campaigns for live PIDs and completion
     currently_running = []
     for cid in launched_history:
-        if cid in completed:
+        if cid not in campaign_ids:
             continue
         pid = get_daemon_pid(cid)
         if is_campaign_finished(cid):
-            if pid is not None:
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                except OSError:
-                    pass
             completed.add(cid)
             sync_project_evolution_library(MASTER_HOME, BATCH_ROOT / "campaigns" / cid)
-            cleanup_graduated_campaign_bloat(cid)
-            continue
         if pid is not None:
             currently_running.append(cid)
             sync_project_evolution_library(MASTER_HOME, BATCH_ROOT / "campaigns" / cid)
-        else:
-            # Check if it produced Reviewer evidence before exiting
-            ms_p = BATCH_ROOT / "campaigns" / cid / "research" / "MATH_STATE.json"
-            if ms_p.is_file():
-                try:
-                    ms = json.loads(ms_p.read_text())
-                    if len(ms.get("evidence", [])) >= 5:
-                        completed.add(cid)
-                        sync_project_evolution_library(MASTER_HOME, BATCH_ROOT / "campaigns" / cid)
-                        continue
-                except Exception:
-                    pass
 
-    # 2. Fill slots up to TARGET_CONCURRENCY (14) using gpt-6.1-sol
     slots_needed = max(0, TARGET_CONCURRENCY - len(currently_running))
     newly_launched = []
+    launch_failures = {}
     if slots_needed > 0:
         for item in queue:
             cid = item["campaign_id"]
@@ -172,24 +94,41 @@ def tick() -> dict:
                 continue
             env = os.environ.copy()
             env["ARGUS_CAMPAIGN_MODEL"] = "gpt-6.1-sol"
-            res = subprocess.run(
-                [PYTHON_BIN, LAUNCH_SCRIPT, cid],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=90,
-                check=False,
-            )
+            target = item.get("research_target_level")
+            if target:
+                env["ARGUS_SKILL_RESEARCH_TARGET_LEVEL"] = target
+            try:
+                res = subprocess.run(
+                    [PYTHON_BIN, LAUNCH_SCRIPT, cid],
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    timeout=90,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired:
+                launch_failures[cid] = "launcher timed out; completion not established"
+                continue
             if res.returncode == 0:
-                currently_running.append(cid)
                 if cid not in launched_history:
                     launched_history.append(cid)
+                if get_daemon_pid(cid) is None:
+                    if is_campaign_finished(cid):
+                        completed.add(cid)
+                    else:
+                        launch_failures[cid] = "launcher exited zero without a live daemon"
+                    continue
+                currently_running.append(cid)
+                sync_project_evolution_library(MASTER_HOME, BATCH_ROOT / "campaigns" / cid)
                 newly_launched.append(cid)
                 slots_needed -= 1
                 if slots_needed <= 0:
                     break
+            else:
+                launch_failures[cid] = (res.stdout + res.stderr).strip()[-2000:]
 
     state = {
+        **state,
         "updated_at": datetime.now(UTC).isoformat(),
         "target_concurrency": TARGET_CONCURRENCY,
         "model": "gpt-6.1-sol",
@@ -200,6 +139,7 @@ def tick() -> dict:
         "newly_launched": newly_launched,
         "total_queue": len(queue),
         "launched_history": launched_history,
+        "launch_failures": launch_failures,
     }
     STATE_PATH.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n")
     return state

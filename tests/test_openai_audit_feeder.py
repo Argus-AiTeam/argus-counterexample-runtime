@@ -1,0 +1,127 @@
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from counterexample_harness import launch_campaign_argus as launcher
+from counterexample_harness import openai_audit_feeder as feeder
+
+
+@pytest.fixture
+def audit_fleet(tmp_path, monkeypatch):
+    monkeypatch.setattr(feeder, "BATCH_ROOT", tmp_path)
+    monkeypatch.setattr(feeder, "QUEUE_PATH", tmp_path / "queue.json")
+    monkeypatch.setattr(feeder, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(feeder, "TARGET_CONCURRENCY", 1)
+    monkeypatch.setattr(feeder, "sync_project_evolution_library", lambda *args: None)
+    feeder.QUEUE_PATH.write_text(json.dumps([{"campaign_id": "9100001"}]))
+    monkeypatch.setattr(
+        feeder, "vertical_completion_certificate_status", lambda *args: {"ok": False}
+    )
+    return tmp_path / "campaigns" / "9100001"
+
+
+@pytest.mark.parametrize("verdict", ["supports", "refutes", "inconclusive"])
+def test_evidence_count_is_not_completion(audit_fleet, verdict):
+    research = audit_fleet / "research"
+    research.mkdir(parents=True)
+    (research / "MATH_STATE.json").write_text(json.dumps({
+        "evidence": [{"produced_by": "reviewer:test", "verdict": verdict}] * 20,
+    }))
+    reviewer = audit_fleet / "roles" / "reviewer"
+    reviewer.mkdir(parents=True)
+    (reviewer / "progress.json").write_text('{"status": "bounded_review_complete"}')
+    assert not feeder.is_campaign_finished("9100001")
+
+
+def test_unbound_pipeline_flags_are_not_completion(audit_fleet):
+    state = audit_fleet / ".argus"
+    state.mkdir(parents=True)
+    (state / "PIPELINE_STATE.json").write_text(
+        '{"completed": true, "current_stage": "complete"}'
+    )
+    assert not feeder.is_campaign_finished("9100001")
+
+
+def test_native_certificate_is_authoritative(audit_fleet, monkeypatch):
+    monkeypatch.setattr(
+        feeder, "vertical_completion_certificate_status", lambda *args: {"ok": True}
+    )
+    assert feeder.is_campaign_finished("9100001")
+
+
+@pytest.mark.parametrize("matching_home", [False, True])
+def test_pid_must_belong_to_this_campaign(audit_fleet, monkeypatch, tmp_path, matching_home):
+    monkeypatch.setattr(feeder, "ZIMO", tmp_path)
+    home = tmp_path / ".argus-campaign-9100001"
+    project = home / "projects" / "test"
+    project.mkdir(parents=True)
+    (project / "daemon.pid").write_text("123")
+
+    def read_bytes(path):
+        if path.name == "cmdline":
+            return b"/venv/bin/python\0/venv/bin/argus\0--daemon\0"
+        actual_home = home if matching_home else tmp_path / ".argus-campaign-other"
+        return f"ARGUS_SKILL_HOME={actual_home}\0".encode()
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    assert feeder.get_daemon_pid("9100001") == (123 if matching_home else None)
+
+
+def test_exited_partial_campaign_is_relaunched_not_graduated(audit_fleet, monkeypatch):
+    audit_fleet.mkdir(parents=True)
+    feeder.STATE_PATH.write_text(json.dumps({
+        "completed": ["9100001"], "launched_history": ["9100001"],
+        "audit_generation": "per-manuscript-v2",
+    }))
+    calls = []
+    monkeypatch.setattr(feeder, "get_daemon_pid", lambda cid: 123 if calls else None)
+
+    def launch(*args, **kwargs):
+        calls.append(args[0])
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(feeder.subprocess, "run", launch)
+    state = feeder.tick()
+    assert calls
+    assert state["completed"] == []
+    assert state["active"] == ["9100001"]
+    assert state["audit_generation"] == "per-manuscript-v2"
+
+
+def test_certified_daemon_is_allowed_to_exit_without_killing(audit_fleet, monkeypatch):
+    feeder.STATE_PATH.write_text(json.dumps({"launched_history": ["9100001"]}))
+    monkeypatch.setattr(
+        feeder, "vertical_completion_certificate_status", lambda *args: {"ok": True}
+    )
+    monkeypatch.setattr(feeder, "get_daemon_pid", lambda cid: 123)
+    monkeypatch.setattr(feeder.os, "kill", lambda *args: pytest.fail("must not kill daemon"))
+    state = feeder.tick()
+    assert state["completed"] == ["9100001"]
+    assert state["active"] == ["9100001"]
+
+
+def test_zero_exit_without_daemon_is_not_active_or_complete(audit_fleet, monkeypatch):
+    monkeypatch.setattr(feeder, "get_daemon_pid", lambda cid: None)
+    monkeypatch.setattr(
+        feeder.subprocess, "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+    state = feeder.tick()
+    assert state["completed"] == []
+    assert state["active"] == []
+    assert "9100001" in state["launch_failures"]
+
+
+@pytest.mark.parametrize("target", ["exploratory", "publishable", "doctoral"])
+def test_launcher_respects_explicit_target(tmp_path, monkeypatch, target):
+    monkeypatch.setenv("ARGUS_SKILL_RESEARCH_TARGET_LEVEL", target)
+    assert launcher.campaign_research_target_level(tmp_path) == target
+
+
+def test_launcher_preserves_existing_doctoral_default(tmp_path, monkeypatch):
+    from argus_skill.core import research_contract
+
+    monkeypatch.setattr(research_contract, "resolve_research_target_level", lambda _: "doctoral")
+    assert launcher.campaign_research_target_level(tmp_path) == "doctoral"
