@@ -99,14 +99,29 @@ def render_skill_library_paths(
     own_pools = ROLE_SKILL_POOLS.get(role, frozenset({role}))
     reference_pools = ROLE_CROSS_READ_POOLS.get(role, frozenset())
     lines = []
+    populated_own: list[Path] = []
     for index, root in enumerate(roots, 1):
         own = ", ".join(
             "root" if pool == "general" else pool for pool in sorted(own_pools)
         )
         references = ", ".join(sorted(reference_pools)) or "none"
+        has_md = root.is_dir() and any(root.rglob("*.md"))
+        status_suffix = "" if has_md else "; currently empty — search lower layers"
         lines.append(
-            f"{index}. `{root}` (OWN: {own}; REFERENCE only: {references})"
+            f"{index}. `{root}` (OWN: {own}; REFERENCE only: {references}{status_suffix})"
         )
+        if has_md:
+            for pool in sorted(own_pools):
+                pool_dir = root if pool == "general" else root / pool
+                if pool_dir.is_dir() and any(pool_dir.rglob("*.md")) and pool_dir not in populated_own:
+                    populated_own.append(pool_dir)
+    populated_block = (
+        "\nNon-empty OWN directories to search recursively (`**/*.md`):\n"
+        + "\n".join(f"- `{path}`" for path in populated_own)
+        + "\n"
+        if populated_own
+        else ""
+    )
     required = _required_paths(roots, required_relative_paths)
     required_block = (
         "\nRequired for this mission (open these bodies before repository work):\n"
@@ -119,13 +134,14 @@ def render_skill_library_paths(
         "## Skill libraries (on-demand)\n"
         f"Role: {role}. Order: project → vertical/domain → global; OWN > REFERENCE.\n"
         + "\n".join(lines)
+        + populated_block
         + required_block
         + "\n\nYour first action, before any repository tool, is one native Skill decision: "
         "inspect the available descriptions (not every body), and immediately open "
         "only the body whose description clearly names this task's operation or "
         "artifact. Do not postpone this decision until after repository exploration. "
-        "If native descriptions are unavailable, do one targeted filename/frontmatter "
-        "search in OWN paths; on a miss, open nothing. Never scan all bodies or open "
+        "If native descriptions are unavailable, do one targeted recursive (`**/*.md`) "
+        "filename/frontmatter search across all non-empty OWN directories above; on a miss, open nothing. Never scan all bodies or open "
         "adjacent Skills. Task, evidence, and role boundaries override Skills. These "
         "paths are the portable fallback; bodies are not injected. Re-probe mutable "
         "facts before use."
