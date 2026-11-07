@@ -2,6 +2,7 @@
 
 本仓库将 **Live Counterexample Lab（开放猜想反例与状态审计实验，2026.08–2026.09）** 所使用的 **冻结版 Argus 运行时（`argus-skill 0.1.2`）** 与 **`math` Vertical（数学垂直领域插件）**、**命题账本/证明图校验器**、**Jacobian 适配器**、**注入规则（Special Prompts）** 以及 **集群调度脚本（Harness）** 完整打包在同一个公开仓库中，可直接安装、运行与对照参考。
 
+- **顶层规格（权威）：**[`docs/MATH_SPEC.zh-CN.md`](docs/MATH_SPEC.zh-CN.md)。提示、campaign 契约和工具都从它派生；与它冲突时以它为准。
 - [English README](README.md)
 - 数学成果归档仓库（72 个结果包 + 独立论文 PDF）：<https://github.com/Argus-AiTeam/argus-mathematics>
 
@@ -31,9 +32,9 @@
 本仓库包含实验全周期使用的全部 3 个冻结版本分支：
 
 1. **`main` 分支（默认，完整在线运行版）**
-   - 对应服务器上 `/home/argustest/zimo/argus-live-update` 的最终完整状态（`feature/counterexample-lab-jacobian-update` @ `60a7a2b6` + 10 个工作区热修补丁 [`COUNTEREXAMPLE_RUNTIME_GUIDE.md`](COUNTEREXAMPLE_RUNTIME_GUIDE.md)），并附带 `counterexample_harness/` 与 `counterexample_special_prompts/`。
+   - 对应服务器上 `/home/argustest/zimo/argus-live-update` 的最终完整状态，截至 2026-11-07（`feature/counterexample-lab-jacobian-update` @ `cad2bb44` + 工作区热修补丁 [`docs/live-runtime/working-tree-20261107.patch`](docs/live-runtime/working-tree-20261107.patch)；campaign 自进化出的 skill 放在 `counterexample_harness/shared_skills/`，不在 `argus_skill/` 里），并附带 `counterexample_harness/` 与 `counterexample_special_prompts/`。
 2. **`feature/counterexample-lab-jacobian-update` 分支**
-   - 对应 `/home/argustest/zimo/argus-live-update` 的原始 Git HEAD（`60a7a2b6`）。
+   - 2026 年 9 月 live 运行时（`60a7a2b6`）的快照线，之后同步到 2026-11-04。当前 live 的 HEAD 是 `cad2bb44`，其精确状态以 `main` 加上方补丁为准。
 3. **`baseline-33da786` 分支**
    - 对应 `/home/argustest/zimo/argus-latest` 的固定基线版本（`33da786bbc6787a2eeb63a5f492498eae87c78c7`），实验中用于统一 pinned 账本校验。
    - 对比基线版与完整运行版的全部代码改动：<https://github.com/Argus-AiTeam/argus-counterexample-runtime/compare/baseline-33da786...main>

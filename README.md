@@ -2,6 +2,7 @@
 
 This repository packages the exact **frozen Argus runtime (`argus-skill 0.1.2`)** together with the **`math` vertical**, **claim-ledger / proof-graph checkers**, **Jacobian MCP adapter**, **injected special prompts**, and **fleet supervision harness** used in the **Argus Live Counterexample Lab** campaigns (August–September 2026) in a single unified repository.
 
+- **Top-level spec (authoritative):** [`docs/MATH_SPEC.zh-CN.md`](docs/MATH_SPEC.zh-CN.md). Prompts, campaign contracts and tools derive from it; where they disagree, the spec wins.
 - [中文说明 (Chinese README)](README.zh-CN.md)
 - Public mathematical results archive (72 result packages + standalone AMS LaTeX papers): <https://github.com/Argus-AiTeam/argus-mathematics>
 
@@ -29,9 +30,9 @@ This repository packages the exact **frozen Argus runtime (`argus-skill 0.1.2`)*
 ## 2. Frozen Branches in This Repository
 
 1. **`main` (Default — Complete Live Runtime + Vertical + Harness)**
-   - Exact snapshot of `/home/argustest/zimo/argus-live-update` (`feature/counterexample-lab-jacobian-update` @ `60a7a2b6` + the 10 live working-tree patches) together with `math_vertical/`, `counterexample_special_prompts/`, and `counterexample_harness/`.
+   - Exact snapshot of `/home/argustest/zimo/argus-live-update` as of 2026-11-07 (`feature/counterexample-lab-jacobian-update` @ `cad2bb44` + the live working-tree patch [`docs/live-runtime/working-tree-20261107.patch`](docs/live-runtime/working-tree-20261107.patch); campaign-evolved skills are kept in `counterexample_harness/shared_skills/`, not in `argus_skill/`) together with `math_vertical/`, `counterexample_special_prompts/`, and `counterexample_harness/`.
 2. **`feature/counterexample-lab-jacobian-update`**
-   - Clean Git HEAD (`60a7a2b6`) of `/home/argustest/zimo/argus-live-update`.
+   - Snapshot line of the September 2026 live runtime (`60a7a2b6`), with later syncs through 2026-11-04. The current live HEAD is `cad2bb44`; its exact state is `main` plus the patch above.
 3. **`baseline-33da786`**
    - Exact frozen baseline snapshot (`33da786bbc6787a2eeb63a5f492498eae87c78c7`) from `/home/argustest/zimo/argus-latest`.
    - Full diff from `baseline-33da786` to `main`: <https://github.com/Argus-AiTeam/argus-counterexample-runtime/compare/baseline-33da786...main>

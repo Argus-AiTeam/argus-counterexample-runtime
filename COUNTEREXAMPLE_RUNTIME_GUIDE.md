@@ -10,7 +10,7 @@ Full standalone runtime repository: **<https://github.com/Argus-AiTeam/argus-cou
 
 | Component | Checkout Path on Host | Branch / Commit | Purpose |
 |---|---|---|---|
-| **Argus Live Runtime** (`argus-skill 0.1.2`) | `/home/argustest/zimo/argus-live-update` | Branch `feature/counterexample-lab-jacobian-update` (`60a7a2b6` + `argus-live-update-working-tree.patch`) | Autonomous daemon runtime (`Manager`, `Planner`, `Engineer`, `Reviewer`), Jacobian MCP adapter, Lean 4 evidence checker, and terminal-state settlement |
+| **Argus Live Runtime** (`argus-skill 0.1.2`) | `/home/argustest/zimo/argus-live-update` | Branch `feature/counterexample-lab-jacobian-update` (`cad2bb44` + `docs/live-runtime/working-tree-20261107.patch`; September 2026: `60a7a2b6`) | Autonomous daemon runtime (`Manager`, `Planner`, `Engineer`, `Reviewer`), Jacobian MCP adapter, Lean 4 evidence checker, and terminal-state settlement |
 | **Argus Pinned Baseline** (`argus-skill 0.1.2`) | `/home/argustest/zimo/argus-latest` | `main` @ `33da786bbc6787a2eeb63a5f492498eae87c78c7` | Pinned schema validator for `python -m argus_skill.verticals.math.math_state check` and `proof_graph_check` |
 | **Jacobian Symbolic/Exact Engine** (`0.14.0`) | `/home/argustest/zimo/references/jacobian` | `7df85cac75e3a249cb69c6bae685c42b75a31390` | Typed exact mathematical operations (Farkas certificates, SMT `QF_LIA`, Smith normal form, resultants, graph domination/cuts/isomorphism) |
 
