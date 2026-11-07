@@ -1027,7 +1027,40 @@ def _certificates(state: MathState, claim: ClaimVersion) -> list[dict[str, str]]
     ]
 
 
-def certificate_issues(state: MathState) -> tuple[StateIssue, ...]:
+def _artifact_key(artifact: str, project_root: Path | None) -> str:
+    """One spelling per file, so the same certificate compares equal to itself.
+
+    ``verify`` records certificates project-relative, but a reviewer is free to
+    cite the same file by its absolute path. Compared as raw strings those are
+    two documents, and a verdict about the certificate in force was reported as
+    a verdict about a retired one.
+    """
+    if project_root is None:
+        return artifact
+    path = Path(artifact)
+    if not path.is_absolute():
+        path = project_root / path
+    return _project_relative(path, project_root)
+
+
+def _certificate_subject(artifact: str, project_root: Path | None) -> object:
+    """The subject a certificate file says it was minted for, or ``None``."""
+    path = Path(artifact)
+    if not path.is_absolute():
+        if project_root is None:
+            return None
+        path = project_root / path
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    subject = payload.get("subject") if isinstance(payload, dict) else None
+    return subject if isinstance(subject, dict) else None
+
+
+def certificate_issues(
+    state: MathState, project_root: Path | None = None
+) -> tuple[StateIssue, ...]:
     """Judgements that were made about a certificate the claim has moved past.
 
     A defect the kernel cannot state, because it is about certificates and the
@@ -1055,12 +1088,24 @@ def certificate_issues(state: MathState) -> tuple[StateIssue, ...]:
     document it was reached from, so there is nothing here to contradict — and
     it is also not protected by this check, which is the reason the reviewer
     skill asks for the citation.
+
+    Only a certificate that was minted for this exact claim version can have
+    been retired from it: ``retire_superseded_evidence`` replaces records with
+    the same subject, nothing else. A certificate whose own ``subject`` names a
+    different claim version — the one a project under review was compiled for,
+    say, read as input material — was never this claim's to lose, so citing it
+    is ordinary reading and not a stale approval. Reporting it named a remedy
+    ("read the certificate this claim cites now") that cannot exist for a claim
+    with no certificate, which is the trap the paragraph above warns about.
+    When ``project_root`` is given, paths are compared by the file they name
+    and the cited certificate is opened to read its subject; a certificate that
+    cannot be read stays reported, because that is the conservative answer.
     """
     issues: list[StateIssue] = []
     for claim in sorted(state.current_claims(), key=lambda item: item.claim_id):
         subject = claim.ref()
         current = {
-            record.artifact
+            _artifact_key(record.artifact, project_root)
             for record in state.evidence
             if record.subject == subject
             and record.tier is not EvidenceTier.JUDGEMENT
@@ -1071,10 +1116,14 @@ def certificate_issues(state: MathState) -> tuple[StateIssue, ...]:
                 record.subject != subject
                 or record.tier is not EvidenceTier.JUDGEMENT
                 or not record.artifact
-                or record.artifact in current
+                or _artifact_key(record.artifact, project_root) in current
                 or Path(record.artifact).parent.name != _CERTIFICATE_DIRNAME
             ):
                 continue
+            if project_root is not None:
+                minted_for = _certificate_subject(record.artifact, project_root)
+                if minted_for is not None and minted_for != subject.as_dict():
+                    continue
             issues.append(
                 StateIssue(
                     "judgement_certificate_retired",
@@ -1614,7 +1663,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if args.command == "check":
             state = load_state(root)
-            issues = (*state.validate(), *certificate_issues(state))
+            issues = (*state.validate(), *certificate_issues(state, root))
             print(
                 json.dumps(
                     {"ok": not issues, "issues": [item.as_dict() for item in issues]},
