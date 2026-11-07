@@ -149,9 +149,10 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每张证�
 - 审查模式（§5）在现行 runtime 中借用 `exploratory` 目标级别运行，靠 campaign 契约说明新颖性填
   `not_applicable`；尚未成为独立模式。
 
-- 现行 9200 轮契约（`counterexample_harness/old_draft_review_objective.md`）只要求审查 Argus 自己的旧稿，
-  并写明"不是新的找错""不要扩展成新研究"，偏离了 §1 初心（核验并讲清 OpenAI 论文；错误、不足、推进都是成果）。
-  替换契约见 `counterexample_harness/openai_family_objective.md`：核验并讲清 OpenAI 论文，同时保留旧稿审查作为并列交付。
+- 9200 轮最初的契约（`counterexample_harness/old_draft_review_objective.md`）只要求审查 Argus 自己的旧稿，
+  偏离了 §1 初心。2026-11-07 起，未完成的 322 个家族已切换到 `counterexample_harness/openai_family_objective.md`；
+  切换前已完成的 51 个家族只做了旧稿审查，没有逐篇读懂报告和核验结论，待定是否补做。
+- 3 个撤稿家族（W01–W03）尚未纳入队列。
 
 ## 10. 待定（需要你拍板）
 
