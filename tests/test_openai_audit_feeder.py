@@ -54,6 +54,76 @@ def test_native_certificate_is_authoritative(audit_fleet, monkeypatch):
     assert feeder.is_campaign_finished("9100001")
 
 
+def test_reviewed_negative_audit_certifies_and_releases_a_fleet_slot(audit_fleet, monkeypatch):
+    from argus_skill.core.models import ReviewDecision
+    from argus_skill.manager import Manager
+    from argus_skill.skills.stage_machine import advance_stage
+    from argus_skill.skills.vertical_select import (
+        persist_vertical,
+        vertical_completion_certificate_status,
+    )
+    from argus_skill.verticals.math.objective_mode import set_objective
+
+    persist_vertical(
+        audit_fleet, "math", workflow_mode="staged", research_target_level="exploratory"
+    )
+    set_objective(audit_fleet, mode="exploratory")
+    advance_stage(audit_fleet, target_stage="solve", reason="scope reviewed")
+    advance_stage(audit_fleet, target_stage="review", reason="investigation reviewed")
+    review = ReviewDecision(
+        status="done",
+        reason="The source-bound investigation is complete, not the manuscript theorem.",
+        next_action="",
+        research_result={
+            "result_class": "honest_final_report",
+            "correctness_status": "verified",
+            "novelty_status": "not_applicable",
+            "significance_status": "exploratory",
+            "statement_fidelity_status": "verified",
+            "evidence": ["The proposed counterexample fails an original hypothesis."],
+            "limitations": ["Unexamined manuscript claims remain unresolved."],
+        },
+    )
+    decision = Manager(
+        project_root=audit_fleet, execution_workdir=audit_fleet, runner=object()
+    ).decide_stage_transition(
+        review=review,
+        project_root=audit_fleet,
+        mission_scope="final_submission",
+        open_ended=False,
+        run_exec=lambda _prompt: SimpleNamespace(
+            last_agent_message=(
+                '{"action":"complete","target_stage":"review","reason":"scoped audit accepted"}'
+            )
+        ),
+    )
+    assert decision.action == "complete"
+    monkeypatch.setattr(
+        feeder, "vertical_completion_certificate_status", vertical_completion_certificate_status
+    )
+    feeder.QUEUE_PATH.write_text(json.dumps([
+        {"campaign_id": "9100001"}, {"campaign_id": "9100002"},
+    ]))
+    feeder.STATE_PATH.write_text(json.dumps({"launched_history": ["9100001"]}))
+    launches = []
+
+    def launch(command, **kwargs):
+        launches.append(command[-1])
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(feeder.subprocess, "run", launch)
+    monkeypatch.setattr(
+        feeder, "get_daemon_pid",
+        lambda cid: 123 if cid == "9100002" and launches else None,
+    )
+
+    state = feeder.tick()
+
+    assert state["completed"] == ["9100001"]
+    assert state["active"] == ["9100002"]
+    assert launches == ["9100002"]
+
+
 def test_feeder_reads_the_daemons_runtime_not_the_interpreters_install(tmp_path):
     skills = tmp_path / "argus-live-update/argus_skill/skills"
     skills.mkdir(parents=True)
