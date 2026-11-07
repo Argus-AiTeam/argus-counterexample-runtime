@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,6 +52,32 @@ def test_native_certificate_is_authoritative(audit_fleet, monkeypatch):
         feeder, "vertical_completion_certificate_status", lambda *args: {"ok": True}
     )
     assert feeder.is_campaign_finished("9100001")
+
+
+def test_feeder_reads_the_daemons_runtime_not_the_interpreters_install(tmp_path):
+    skills = tmp_path / "argus-live-update/argus_skill/skills"
+    skills.mkdir(parents=True)
+    (skills.parent / "__init__.py").write_text("")
+    (skills / "__init__.py").write_text("")
+    (skills / "builtins.py").write_text(
+        "def sync_project_evolution_library(*args): pass\n"
+    )
+    (skills / "vertical_select.py").write_text(
+        "def vertical_completion_certificate_status(*args): return {'runtime': 'daemon'}\n"
+    )
+    code = (
+        "import importlib.util;"
+        f"s=importlib.util.spec_from_file_location('feeder',{str(Path(feeder.__file__))!r});"
+        "m=importlib.util.module_from_spec(s);s.loader.exec_module(m);"
+        "print(m.vertical_completion_certificate_status('', '')['runtime'])"
+    )
+    output = subprocess.check_output(
+        [sys.executable, "-c", code],
+        cwd=tmp_path,
+        env={**os.environ, "ARGUS_AUDIT_WORKSPACE": str(tmp_path)},
+        text=True,
+    )
+    assert output.strip() == "daemon"
 
 
 @pytest.mark.parametrize("matching_home", [False, True])

@@ -20,6 +20,7 @@ QUEUE_PATH = AUDIT_DIR / "openai_373_queue.json"
 STATE_PATH = AUDIT_DIR / "fleet_state.json"
 TARGET_CONCURRENCY = 24
 
+sys.path.insert(0, str(ZIMO / "argus-live-update"))
 from argus_skill.skills.builtins import sync_project_evolution_library
 from argus_skill.skills.vertical_select import vertical_completion_certificate_status
 
