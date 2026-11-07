@@ -60,3 +60,19 @@ def test_changed_inventory_does_not_overwrite_an_existing_review(tmp_path):
         materialize(tmp_path, snapshot)
 
     assert verdict.read_text() == "preserved review evidence"
+
+
+def test_unrelated_workspace_is_not_repurposed(tmp_path):
+    old = tmp_path / "campaigns/9000001/research"
+    old.mkdir(parents=True)
+    (old / "proof.md").write_text("old draft")
+    root = tmp_path / "campaigns/9200001"
+    root.mkdir()
+    (root / "OBJECTIVE.md").write_text("unrelated operator task")
+    snapshot = tmp_path / "snapshot.json"
+    snapshot.write_text('{"files": []}')
+
+    with pytest.raises(ValueError, match="Refusing to overwrite"):
+        materialize(tmp_path, snapshot)
+
+    assert (root / "OBJECTIVE.md").read_text() == "unrelated operator task"

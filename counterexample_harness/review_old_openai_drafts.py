@@ -85,6 +85,8 @@ def materialize(batch_root: Path, snapshot_manifest: Path) -> list[dict]:
             if manifest_path.read_text() != text:
                 raise ValueError(f"Existing review has a different input inventory: {root}")
         else:
+            if root.exists() and any(root.iterdir()):
+                raise ValueError(f"Refusing to overwrite an existing workspace: {root}")
             root.mkdir(parents=True, exist_ok=True)
             manifest_path.write_text(text)
             (root / "OBJECTIVE.md").write_text(TEMPLATE.read_text())
