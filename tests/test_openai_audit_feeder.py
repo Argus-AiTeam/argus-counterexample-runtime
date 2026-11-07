@@ -120,8 +120,38 @@ def test_launcher_respects_explicit_target(tmp_path, monkeypatch, target):
     assert launcher.campaign_research_target_level(tmp_path) == target
 
 
-def test_launcher_preserves_existing_doctoral_default(tmp_path, monkeypatch):
+@pytest.mark.parametrize("target", ["exploratory", "publishable", "doctoral"])
+def test_launcher_preserves_existing_target(tmp_path, monkeypatch, target):
     from argus_skill.core import research_contract
 
-    monkeypatch.setattr(research_contract, "resolve_research_target_level", lambda _: "doctoral")
-    assert launcher.campaign_research_target_level(tmp_path) == "doctoral"
+    monkeypatch.delenv("ARGUS_SKILL_RESEARCH_TARGET_LEVEL", raising=False)
+    monkeypatch.delenv("ARGUS_SKILL_MATH_RESEARCH_TARGET_LEVEL", raising=False)
+    monkeypatch.setattr(research_contract, "resolve_research_target_level", lambda _: target)
+    assert launcher.campaign_research_target_level(tmp_path) == target
+
+
+def test_launcher_applies_declared_audit_mode_before_manager_startup(tmp_path, monkeypatch):
+    from argus_skill.skills.vertical_select import persist_vertical
+    from argus_skill.verticals.math.objective_mode import (
+        adopt_operator_objective,
+        resolve_objective,
+    )
+
+    workdir = tmp_path / "campaigns" / "9100001"
+    workdir.mkdir(parents=True)
+    (workdir / "OBJECTIVE.md").write_text("Search for a source-bound erroneous lemma.")
+    (workdir / "campaign.json").write_text('{"math_objective_mode": "exploratory"}')
+    persist_vertical(workdir, "math", research_target_level="exploratory")
+    adopt_operator_objective(workdir, "Old full-paper audit goal")
+    monkeypatch.setattr(launcher, "ROOT", tmp_path)
+    monkeypatch.setattr(launcher.sys, "argv", ["launch", "9100001"])
+    monkeypatch.setattr(launcher.shutil, "copytree", lambda *args, **kwargs: None)
+    monkeypatch.setenv("ARGUS_SKILL_RESEARCH_TARGET_LEVEL", "exploratory")
+    monkeypatch.setattr(
+        launcher.subprocess, "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout="", stderr=""),
+    )
+
+    launcher.main()
+
+    assert resolve_objective(workdir).mode == "exploratory"

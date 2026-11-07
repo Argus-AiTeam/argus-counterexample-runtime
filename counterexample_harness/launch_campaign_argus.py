@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -72,12 +73,13 @@ def campaign_research_target_level(workdir: Path) -> str:
     override = research_target_env_override()
     if override is not None:
         return override
-    return "doctoral" if resolve_research_target_level(workdir) == "doctoral" else "publishable"
+    return resolve_research_target_level(workdir) or "publishable"
 
 
 def main() -> None:
     sys.path.insert(0, str(ROOT.parent / "argus-live-update"))
     from argus_skill.skills.vertical_select import persist_vertical
+    from argus_skill.verticals.math.objective_mode import set_objective
 
     selected = tuple(sys.argv[1:]) or IDS
     unknown = {
@@ -97,6 +99,12 @@ def main() -> None:
             workflow_mode="staged",
             research_target_level=target_level,
         )
+        campaign_path = workdir / "campaign.json"
+        if campaign_path.is_file():
+            campaign = json.loads(campaign_path.read_text())
+            mode = campaign.get("math_objective_mode")
+            if mode:
+                set_objective(workdir, mode=mode, goal=campaign.get("math_goal", ""))
         env = os.environ.copy()
         env.update(MODEL_ENV)
         env["ARGUS_SKILL_RESEARCH_TARGET_LEVEL"] = target_level
