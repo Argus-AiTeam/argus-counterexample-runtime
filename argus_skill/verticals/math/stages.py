@@ -223,7 +223,7 @@ def _math_state_issues(project_root: Path) -> tuple[str, ...]:
         return (f"{state_path(project_root).name}: {exc}",)
     return tuple(
         item.rendered()
-        for item in (*state.validate(), *certificate_issues(state))
+        for item in (*state.validate(), *certificate_issues(state, project_root))
     )
 
 

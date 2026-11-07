@@ -85,6 +85,28 @@ The footer may optionally end with `PLAN_UPDATE=` followed by the complete
 multi-line Markdown for RESEARCH_PLAN.md. Put it after every `TASK_*` block.
 """
 
+_MAINTENANCE_BULLET = """- Cited `life.planner.error`/`life.manager.intent.failed`, review-churn receipts, or
+  corrective OperatorContext may yield `TASK_VERTICAL=argus_maintenance`. Require
+  a harness hypothesis, executable acceptance, non-goals, isolated Engineer→Reviewer,
+  no counters/detectors/audits/make-work, and Reviewer `done` plus operator approval
+  before deployment.
+"""
+
+
+def _planner_core_contract() -> str:
+    """The core contract, minus self-repair when the operator disabled it."""
+    from ...core.maintenance_policy import (
+        DISABLED_PLANNER_GUIDANCE,
+        framework_maintenance_enabled,
+    )
+
+    if framework_maintenance_enabled():
+        return _PLANNER_CORE_CONTRACT
+    return _PLANNER_CORE_CONTRACT.replace(
+        _MAINTENANCE_BULLET, DISABLED_PLANNER_GUIDANCE + "\n"
+    )
+
+
 _RESEARCH_PLAN_CONTRACT = """## Research plan (living document)
 Planner owns `RESEARCH_PLAN.md` in the daemon state directory. If there is no
 valid plan below, create it now from the Manager mission brief/OBJECTIVE.md and
@@ -569,7 +591,7 @@ def build_continuous_prompt(
         optimize_banner,
         research_target_block,
         standing_continuous_block,
-        _PLANNER_CORE_CONTRACT,
+        _planner_core_contract(),
         native_shell_summary(),
         host_policy_block,
         objective_contract_block,

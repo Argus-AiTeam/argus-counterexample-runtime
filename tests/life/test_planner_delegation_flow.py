@@ -127,6 +127,61 @@ def test_planner_delegates_to_engineer_and_continues_after_one_increment(
     assert not list(project.glob("**/*.py")), "Planner must not create implementation files"
 
 
+def test_operator_disabled_framework_maintenance_is_not_enqueued(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """``ARGUS_FRAMEWORK_MAINTENANCE=off`` keeps a fleet off its own runtime.
+
+    Unattended old-draft review campaigns opened Argus-repair missions whose
+    deployment needed an approval nobody was there to give, then waited on
+    them (live 9200002/03/05/10). With the switch off the task is refused at
+    enqueue and says why; the ordinary routed task beside it is unaffected.
+    """
+    monkeypatch.setenv("ARGUS_FRAMEWORK_MAINTENANCE", "off")
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(project)
+    planner = _PlannerBackend([
+        "\n".join([
+            "PROJECT_DONE=false",
+            "REASON=one framework repair and one ordinary task",
+            "TASK_KEY=repair",
+            "TASK_VERTICAL=argus_maintenance",
+            "TASK_TITLE=Repair certification propagation in isolation",
+            "TASK_OBJECTIVE=Patch the running Argus runtime.",
+            "TASK_HYPOTHESIS=The receipt is dropped between Reviewer and Manager.",
+            "TASK_ACCEPTANCE_CHECK=pytest tests/life",
+            "TASK_KEY=work",
+            "TASK_TITLE=Review the next draft unit",
+            "TASK_OBJECTIVE=Write report.md and verdict.json for the next unit.",
+            "TASK_ACCEPTANCE_CHECK=both files exist and cite the unit",
+        ]),
+    ])
+    supervisor = _supervisor(project, tmp_path / "life", planner)
+
+    supervisor._plan_next_work()
+
+    pending = supervisor.memory.backlog.pending()
+    assert [item.title for item in pending] == ["Review the next draft unit"]
+    assert all("framework_maintenance" not in item.tags for item in pending)
+    events = [
+        json.loads(line)
+        for line in (supervisor.memory.root / "events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    skipped = [
+        event for event in events
+        if event.get("type") == "life.planner.task_skipped"
+        and event.get("skip_category") == "framework_maintenance_disabled"
+    ]
+    assert [event["title"] for event in skipped] == [
+        "Repair certification propagation in isolation"
+    ]
+
+
 def test_planner_require_independent_review_survives_enqueue(
     tmp_path: Path,
 ) -> None:

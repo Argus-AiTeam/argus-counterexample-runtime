@@ -558,6 +558,26 @@ class PlanningCycleEnqueueMixin:
                 str(getattr(task, "vertical", "") or "").strip()
                 or campaign_vertical
             )
+            if policy_vertical == "argus_maintenance":
+                from ...core.maintenance_policy import (
+                    ENV_NAME,
+                    framework_maintenance_enabled,
+                )
+
+                if not framework_maintenance_enabled():
+                    self._emit({
+                        "type": EventType.LIFE_PLANNER_TASK_SKIPPED,
+                        "cycle": self._planning_cycles,
+                        "title": task.title,
+                        "objective": task.objective,
+                        "skip_category": "framework_maintenance_disabled",
+                        "reason": (
+                            f"{ENV_NAME}=off: the operator owns Argus framework "
+                            "repairs for this run; report the blocking diagnostic "
+                            "as an operator-required wait instead"
+                        ),
+                    })
+                    continue
             try:
                 policy_contract = load_vertical_contract(
                     policy_vertical,

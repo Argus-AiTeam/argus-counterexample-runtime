@@ -1237,6 +1237,63 @@ def test_judging_the_replacement_reading_clears_the_block(tmp_path: Path) -> Non
     ] == [second.record.artifact]
 
 
+def test_citing_the_certificate_in_force_by_absolute_path_is_not_stale(
+    tmp_path: Path,
+) -> None:
+    """One file, two spellings, one certificate.
+
+    ``verify`` records project-relative paths; a reviewer citing the same file
+    absolutely was reported as having approved a retired reading (live campaign
+    9200027), and the remedy the message named was the thing already done.
+    """
+    _run(tmp_path, "context", "--id", "ctx", "--statement", "Arithmetic.")
+    first = _verify_into_canonical_names(
+        tmp_path, "A", ALPHA, ALPHA_FIDELITY, "two plus two is four"
+    )
+    assert first.record is not None
+    _run(
+        tmp_path, "judge", "--claim", "A", "--verdict", "supports",
+        "--by", "reviewer/alice",
+        "--artifact", str((tmp_path / first.record.artifact).resolve()),
+    )
+
+    code, payload = _run(tmp_path, "check")
+    assert (code, payload["issues"]) == (0, [])
+
+
+def test_citing_a_certificate_minted_for_another_claim_is_not_stale(
+    tmp_path: Path,
+) -> None:
+    """A certificate this claim never stood on cannot have been retired from it.
+
+    Reviewing an earlier project means reading its certificates as input. They
+    were minted for that project's claim versions, so the review ledger's claim
+    has no certificate to "read again", and the old message sent the reviewer
+    after one that does not exist (live campaigns 9200002/07/25).
+    """
+    reviewed = tmp_path / "reviewed"
+    reviewed.mkdir()
+    _run(reviewed, "context", "--id", "ctx", "--statement", "Arithmetic.")
+    old = _verify_into_canonical_names(
+        reviewed, "A", ALPHA, ALPHA_FIDELITY, "two plus two is four"
+    )
+    assert old.record is not None
+
+    review = tmp_path / "review"
+    review.mkdir()
+    _run(review, "context", "--id", "ctx", "--statement", "Review of arithmetic.")
+    _run(review, "claim", "--id", "A", "--context", "ctx",
+         "--statement", "two plus two is four")
+    _run(
+        review, "judge", "--claim", "A", "--verdict", "supports",
+        "--by", "reviewer/alice",
+        "--artifact", str((reviewed / old.record.artifact).resolve()),
+    )
+
+    code, payload = _run(review, "check")
+    assert (code, payload["issues"]) == (0, [])
+
+
 def test_a_verdict_that_cites_nothing_is_left_alone(tmp_path: Path) -> None:
     """Only a citation can go stale, so only a citation is checked.
 
