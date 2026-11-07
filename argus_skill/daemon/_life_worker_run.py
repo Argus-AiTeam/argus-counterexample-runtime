@@ -8,7 +8,6 @@ maintainability line-count target. ``LifeWorkerRunMixin`` is mixed into
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import threading
@@ -16,6 +15,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from pathlib import Path
+from typing import Any
 
 from ._life_worker_boot import _RunForeverState
 from ._life_worker_identity import _effective_runner_backend, _worker_vault_preflight_routes
@@ -29,45 +29,21 @@ from .state import (
 
 log = logging.getLogger(__name__)
 
-_RUNNING_STALL_SECONDS = 30.0
-_RUNNING_HANDOFF_STALL_SECONDS = 300.0
 _RUNNING_STALL_ERROR = "executor exited without completing the task"
 _RUNNING_STALL_POLL_SECONDS = 1.0
-
-
-def _persisted_engineer_handoff_age(
-    runtime_root: Path,
-    item_id: str,
-    *,
-    now: float,
-) -> float | None:
-    """Return the age of a completed Engineer capsule for one running item.
-
-    A provider can finish its final answer before secret-guard, handoff, and
-    Reviewer preparation finish.  During that interval role activity is quiet,
-    but the persisted capsule proves the mission executor is settling a valid
-    Engineer result rather than having vanished.
-    """
-    path = runtime_root / "handoffs" / item_id / "role-sessions" / "engineer.json"
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        decisive_output = str(payload.get("decisive_output") or "").strip()
-        updated_at = float(payload.get("updated_at") or 0.0)
-    except (OSError, TypeError, ValueError, json.JSONDecodeError):
-        return None
-    if not decisive_output or updated_at <= 0:
-        return None
-    return max(0.0, now - updated_at)
 
 
 class LifeWorkerRunMixin:
     """``run_forever``'s post-boot phases: main loop and shutdown."""
 
     def _fail_stalled_running_items(self, rf_state: _RunForeverState) -> list[str]:
-        """Fail durable running claims after every role has gone quiet."""
+        """Fail durable running claims whose executor thread is no longer alive."""
         from ..core.event_catalog import EventType
         from ..life.mission_outcome import mission_outcome_class
         from ..life.role_activity import role_activity
+
+        if self._supervisor_execution_active.is_set():
+            return []
 
         now = time.time()
         activities = role_activity(rf_state.runtime_root, now=now)
@@ -88,30 +64,14 @@ class LifeWorkerRunMixin:
                     "daemon: could not inspect external work before stall decision"
                 )
                 return []
-        role_ages = [
-            float(activity.age_s)
-            for activity in activities.values()
-            if activity.age_s is not None
-        ]
-
+        executor_threads = self._supervisor_execution_threads
         failed: list[str] = []
         for item in rf_state.mem.backlog.active():
             if item.status != "running" or item.started_ts is None:
                 continue
-            quiet_seconds = max(0.0, now - float(item.started_ts))
-            if role_ages:
-                quiet_seconds = min(quiet_seconds, min(role_ages))
-            if quiet_seconds <= _RUNNING_STALL_SECONDS:
-                continue
-            handoff_age = _persisted_engineer_handoff_age(
-                rf_state.runtime_root,
-                item.id,
-                now=now,
-            )
-            if (
-                handoff_age is not None
-                and handoff_age <= _RUNNING_HANDOFF_STALL_SECONDS
-            ):
+            owner = str(getattr(item, "running_owner", "") or "") or "primary"
+            executor_thread = executor_threads.get(owner)
+            if executor_thread is None or executor_thread.is_alive():
                 continue
             if rf_state.mem.backlog.mark_failed(
                 item.id,
@@ -134,6 +94,14 @@ class LifeWorkerRunMixin:
             })
             log.error("daemon: failed stalled running item %s", item.id)
         return failed
+
+    def _run_supervisor_pass(self, supervisor: Any) -> dict:
+        worker_id = str(
+            getattr(getattr(supervisor, "config", None), "worker_id", "primary")
+            or "primary"
+        )
+        self._supervisor_execution_threads[worker_id] = threading.current_thread()
+        return supervisor.run()
 
     def _start_running_stall_watcher(self, rf_state: _RunForeverState) -> None:
         def _watch() -> None:
@@ -318,6 +286,7 @@ class LifeWorkerRunMixin:
             )
             self._foreground_wait_guard.start()
 
+        self._supervisor_execution_active.set()
         self._start_running_stall_watcher(rf_state)
 
     def _rf_main_loop(self, rf_state: _RunForeverState) -> None:
@@ -329,6 +298,7 @@ class LifeWorkerRunMixin:
                     break
                 summary: dict = {}
                 try:
+                    self._supervisor_execution_active.set()
                     from ..manager._session_ops import manager_pipeline_yield_requested
 
                     if manager_pipeline_yield_requested(rf_state.runtime_root):
@@ -349,14 +319,14 @@ class LifeWorkerRunMixin:
                                 "suggested_sleep": rf_state.cfg.poll_interval,
                             }
                         elif len(supervisors) == 1:
-                            summary = rf_state.sup.run()
+                            summary = self._run_supervisor_pass(rf_state.sup)
                         else:
                             with ThreadPoolExecutor(
                                 max_workers=len(supervisors),
                                 thread_name_prefix="argus-mission",
                             ) as executor:
                                 futures = [
-                                    executor.submit(supervisor.run)
+                                    executor.submit(self._run_supervisor_pass, supervisor)
                                     for supervisor in supervisors
                                 ]
                                 summary = futures[0].result()
@@ -403,6 +373,8 @@ class LifeWorkerRunMixin:
                         log.info("daemon: drain pass interrupted by stop request")
                         break
                     log.exception("daemon: drain pass raised; sleeping and retrying")
+                finally:
+                    self._supervisor_execution_active.clear()
                 log.info(
                     "daemon: drain pass stopped_by=%s suggested_sleep=%s",
                     summary.get("stopped_by") or "",

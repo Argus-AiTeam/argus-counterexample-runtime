@@ -75,6 +75,9 @@ _EXPLORATORY_TERMINAL_CLASSES = frozenset({
     "new_reduction",
     "exact_counterexample",
     "lean_local_verification",
+    "honest_final_report",
+    "structured_failure_report",
+    "exhausted_current_methods",
 })
 @dataclass(frozen=True)
 class ResearchTargetContract:

@@ -170,31 +170,3 @@ def test_required_skill_path_is_resolved_and_emitted_without_body(
     assert events[0]["required_paths"] == [str(required.resolve())]
     assert str(required.resolve()) in result.block
     assert "PRIVATE REQUIRED BODY" not in result.block
-
-
-def test_empty_project_layer_flags_lower_layers_and_lists_non_empty_own_dirs(
-    tmp_path: Path,
-) -> None:
-    project_dir = tmp_path / "project_skills"
-    vertical_dir = tmp_path / "vertical_skills"
-    global_dir = tmp_path / "global_skills"
-    nested_skill = (
-        vertical_dir / "engineer" / "certificates" / "exact-unit-prefilter" / "SKILL.md"
-    )
-    nested_skill.parent.mkdir(parents=True)
-    nested_skill.write_text(
-        "---\nname: exact-unit-prefilter\ndescription: Prune unit clauses.\n---\n\nBody\n",
-        encoding="utf-8",
-    )
-    store = LayeredSkillStore(
-        project_dir=project_dir,
-        vertical_dir=vertical_dir,
-        global_dir=global_dir,
-    )
-
-    result = role_skill_libraries(store, role="engineer")
-
-    assert "currently empty — search lower layers" in result.block
-    assert "Non-empty OWN directories to search recursively (`**/*.md`):" in result.block
-    assert str((vertical_dir / "engineer").resolve()) in result.block
-

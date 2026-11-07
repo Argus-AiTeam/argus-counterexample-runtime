@@ -541,25 +541,17 @@ def test_literature_review_cannot_leave_novelty_unverified() -> None:
     ) == "survey_novelty_must_be_not_applicable"
 
 
-def test_exploratory_honesty_alone_cannot_end_research() -> None:
-    result = _research_result("structured_failure_report")
+@pytest.mark.parametrize(
+    "result_class",
+    ["honest_final_report", "structured_failure_report", "exhausted_current_methods"],
+)
+def test_reviewed_exploratory_negative_result_can_end_research(result_class: str) -> None:
+    result = _research_result(result_class)
 
-    assert (
-        research_completion_issue(
-            result,
-            research_target_level="exploratory",
-        )
-        == "result_class_not_exploratory_terminal:structured_failure_report"
-    )
-    assert _final_stage_decision(result, "exploratory") is None
-    assert (
-        _final_stage_decision(
-            result,
-            "exploratory",
-            scientific_decision="continue",
-        )
-        is None
-    )
+    assert research_completion_issue(result, research_target_level="exploratory") == ""
+    assert _final_stage_decision(result, "exploratory") is not None
+    for target in ("publishable", "doctoral"):
+        assert _final_stage_decision(result, target) is None
 
 
 def test_exploratory_decision_relevant_counterexample_can_end_research() -> None:

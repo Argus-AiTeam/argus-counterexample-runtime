@@ -897,7 +897,7 @@ def test_daemon_sink_counts_life_mission_completed() -> None:
     assert worker._missions_completed == 1
 
 
-def test_daemon_fails_running_item_after_roles_go_idle(
+def test_daemon_fails_running_item_when_executor_thread_exits(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -909,6 +909,10 @@ def test_daemon_fails_running_item_after_roles_go_idle(
     memory.backlog.update(item.id, started_ts=time.time() - 31.0)
     events: list[dict[str, Any]] = []
     worker = LifeWorker(LifeWorkerConfig(life_dir=tmp_path, backend="memory"))
+    dead_executor = threading.Thread(target=lambda: None)
+    dead_executor.start()
+    dead_executor.join()
+    worker._supervisor_execution_threads["primary"] = dead_executor
     state = SimpleNamespace(
         mem=memory,
         runtime_root=tmp_path,
@@ -976,11 +980,40 @@ def test_daemon_preserves_running_item_during_persisted_engineer_handoff(
     payload = json.loads(capsule.read_text(encoding="utf-8"))
     payload["updated_at"] = time.time() - 301.0
     capsule.write_text(json.dumps(payload), encoding="utf-8")
+    dead_executor = threading.Thread(target=lambda: None)
+    dead_executor.start()
+    dead_executor.join()
+    worker._supervisor_execution_threads["primary"] = dead_executor
 
     assert worker._fail_stalled_running_items(state) == [item.id]
     stored = next(row for row in memory.backlog.history() if row.id == item.id)
     assert stored.status == "failed"
     assert len(events) == 1
+
+
+@pytest.mark.parametrize("active_pass", [False, True])
+def test_daemon_preserves_live_executor_after_overnight_pause(
+    tmp_path: Path, active_pass: bool,
+) -> None:
+    memory = LifeMemory.open(tmp_path)
+    memory.init()
+    item = memory.backlog.add(BacklogItem.new(title="paused", objective="review the result"))
+    memory.backlog.mark_running(item.id)
+    memory.backlog.update(item.id, started_ts=time.time() - 20 * 3600)
+    events: list[dict[str, Any]] = []
+    worker = LifeWorker(LifeWorkerConfig(life_dir=tmp_path, backend="memory"))
+    worker._supervisor_execution_threads["primary"] = threading.current_thread()
+    if active_pass:
+        worker._supervisor_execution_active.set()
+    state = SimpleNamespace(
+        mem=memory,
+        runtime_root=tmp_path,
+        sink=SimpleNamespace(handle_event=events.append),
+    )
+
+    assert worker._fail_stalled_running_items(state) == []
+    assert next(row for row in memory.backlog.active() if row.id == item.id).status == "running"
+    assert events == []
 
 
 def test_daemon_preserves_running_item_while_external_work_is_waitable(
