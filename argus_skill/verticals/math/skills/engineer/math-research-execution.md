@@ -279,6 +279,10 @@ open — restate the assumption with `--source` alone and no `--source-id`, whic
 reports it as `uncited` and puts the situation in front of the reviewer rather
 than behind a queue nobody can clear.
 
+Before handing a result over for final review, run
+`python -m argus_skill.verticals.math.check`. It runs the delivery gate itself:
+anything it lists will refuse the delivery, so clear it first.
+
 Before investing heavily in a new conjecture, a small counterexample search may
 be useful. For a construction, check that the object satisfies every condition.
 Use literature only when a known result matters or when claiming novelty. These

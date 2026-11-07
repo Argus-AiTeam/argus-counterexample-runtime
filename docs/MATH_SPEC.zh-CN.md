@@ -1,6 +1,6 @@
 # Argus Math 顶层规格
 
-版本 0.2（§9 第 3、4 项已定，第 1、2 项待定） · 2026-11-07
+版本 0.3（§9 第 1、3、4 项已定，第 2 项待定） · 2026-11-07
 
 ## 0. 本文的地位
 
@@ -56,8 +56,9 @@ Argus Math 把一个数学问题变成**别人能独立复核的结论**。
 
 ## 4. 宿主、工具、角色的分工
 
-**宿主** 只做四件事：传信、记账、守权限边界；结论信交给运维时运行 `math check`，
-把输出原样附在信上。宿主不判断数学，不拦截交付，也不判定"完成"。
+**宿主** 只做四件事：传信、记账、守权限边界；结论信交给运维前运行 `math check`，
+**报告有问题就拒绝交付**，并把报告原样退回给交付者。宿主不判断数学本身，
+只执行 `math check` 的机械检查。
 
 **工具** 只陈述机械事实。沿用现有 Python 实现（`argus_skill.verticals.math.*`），下文以 `math …` 简称：
 
@@ -67,7 +68,7 @@ Argus Math 把一个数学问题变成**别人能独立复核的结论**。
 | `math lean verify` | `python -m argus_skill.verticals.math.lean_evidence verify`（异步版 `lean_async`） | 编译并绑定哈希，是机械证据的唯一写入口 |
 | `math cite` | `python -m argus_skill.verticals.math.citation_check` | 查文献是否存在；存档摘录并记录判定 |
 | `math gap` | `python -m argus_skill.verticals.math.proof_graph_check gap` | 目标还依赖哪些未证命题 |
-| `math check` | `math_state check` + `proof_graph_check check` + `citation_check status`（待合成一条命令） | 汇总以上各项，输出交付报告 |
+| `math check` | `python -m argus_skill.verticals.math.check` | 运行交付门禁本身（与宿主拒绝交付用的是同一个函数），有问题时返回非零 |
 
 **角色** 的判断：Reviewer 读论证、读 `math check` 报告，决定是否放行；
 Engineer 做数学；Planner 拆分路线；Manager 对运维负责。
@@ -91,7 +92,7 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每张证�
 
 ## 7. 不做什么
 
-- 不设阶段机，不设宿主门禁。
+- 不设阶段机；宿主门禁只有 `math check` 一处，只做机械检查。
 - 不评分，不按报告数、文件数或行数计成果。
 - 不让 Agent 自修框架，也不让它自己提出部署。
 - 不把审阅者的同意算作证明。
@@ -102,14 +103,22 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每张证�
 - 每条不变量至少对应一个自动测试；pack 和提示里出现与本文冲突的概念（例如阶段机），测试失败。
 - 在 Agent 沙箱里，本文、数学工具和 runtime 只读。
 
+## 已知偏差（现行 runtime 与本文不一致之处）
+
+- 现行 Python runtime 在 `math check` 之外，还有一层研究目标完成检查（结果类别、新颖性、最终认证收据），
+  由 `argus_skill/core/research_contract.py` 和 Manager 完成判定执行。它与本文 §4 "门禁只有一处"不一致，待收敛。
+- 审查模式（§5）在现行 runtime 中借用 `exploratory` 目标级别运行，靠 campaign 契约说明新颖性填
+  `not_applicable`；尚未成为独立模式。
+
 ## 9. 待定（需要你拍板）
 
-1. `math check` 的结果是只附在信上（本稿的写法），还是在"证明"类结论缺少机械证据时拒绝交付？
+1. ~~`math check` 是否拦截~~ 已定：发现问题就拒绝交付（§4）。
 2. 攻关模式下没有 Lean 证明的"证明"，能否作为最终结论交付，还是只能标为"限定结果"？
 3. ~~工具语言~~ 已定：先沿用现有 Python 工具（§4）。
 4. ~~进程模型~~ 已定：每个 campaign 一个进程（§6）。
 
 ## 变更记录
 
+- 0.3（2026-11-07）定：`math check` 发现问题即拒绝交付；提供单条命令 `math check`，与宿主门禁同一函数。
 - 0.2（2026-11-07）定：工具沿用 Python；每个 campaign 一个进程。规格正本移入数学 runtime 仓库 `docs/MATH_SPEC.zh-CN.md`。
 - 0.1（2026-11-07）初稿。依据：OpenAI 旧稿复核舰队（9200 系列）的卡死分析，以及 ts-core 的设计原则。

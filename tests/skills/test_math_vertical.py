@@ -156,8 +156,14 @@ def test_math_vertical_contains_only_contract_skills_and_metadata() -> None:
     # completion check, and the completion gate has no business importing a
     # process launcher. It adds no stage and no required file, and nothing loads
     # it unless someone types `submit`.
+    # `check` is the delivery gate made runnable before delivery (spec
+    # docs/MATH_SPEC.zh-CN.md §4, §9.1). It holds no rule of its own: it calls
+    # `stages.stage_completion_issues` and prints the answer, so an agent sees
+    # the refusal before submitting instead of after. It adds no stage and no
+    # required file.
     assert files == {
         "__init__.py",
+        "check.py",
         "stages.py",
         "citation_check.py",
         "context_projection.py",

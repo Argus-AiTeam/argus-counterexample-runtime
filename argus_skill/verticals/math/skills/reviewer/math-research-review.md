@@ -112,6 +112,10 @@ open. And a confirmed citation discharges no assumption: the source really says
 it, the claim still stands on it, and whether its hypotheses apply here is a
 third question that belongs in your proof review.
 
+Before accepting a delivery, run `python -m argus_skill.verticals.math.check`.
+It is the delivery gate: while it lists an issue the delivery is refused, so
+name each one back to the Engineer rather than certifying around it.
+
 Say plainly whether the outcome is proved, disproved, computational evidence,
 partial progress, a conjecture, or unresolved. Check relevant primary sources
 only when novelty is claimed or required by the requested ambition; otherwise
