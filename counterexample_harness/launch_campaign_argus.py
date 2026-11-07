@@ -110,6 +110,9 @@ def main() -> None:
         env.update(MODEL_ENV)
         env["ARGUS_SKILL_RESEARCH_TARGET_LEVEL"] = target_level
         env["ARGUS_SKILL_MATH_RESEARCH_TARGET_LEVEL"] = target_level
+        # Unattended fleet: framework defects are the operator's to fix. A
+        # campaign that patches Argus waits forever on a deployment approval.
+        env.setdefault("ARGUS_FRAMEWORK_MAINTENANCE", "off")
         campaign_model = (
             os.environ.get("ARGUS_CAMPAIGN_MODEL")
             or ("gpt-6-astra" if campaign_id in ASTRA_CAMPAIGN_IDS else DEFAULT_MODEL)

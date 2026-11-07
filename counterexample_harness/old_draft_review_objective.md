@@ -26,6 +26,17 @@ fabricated success or a blanket assertion that the source is correct. Missing
 access or a run failure alone is not a completed review. Do not expand into a
 new research project just to settle an old draft.
 
+The project deliverable is this review, which asserts no new mathematics of its
+own. In the final research result use novelty_status=not_applicable; record
+each old claim's novelty, attribution and open status inside its unit
+verdict.json instead. When a ledger judgement cites an old workspace's Lean
+certificate, that certificate is reading material for the review, not a
+certificate the review's claim stands on.
+
+This campaign does not repair or redeploy Argus. If the framework blocks
+completion after the review is accepted, stop and report the exact diagnostic
+and events.jsonl line for the operator; do not open framework-maintenance work.
+
 Summarize every unit in research/OLD_ROUND_REVIEW.md. One reviewed unit is not
 family completion. The native Host-invoked independent Reviewer must examine
 the coverage index and the substantive unit assessments and decide whether
