@@ -104,7 +104,8 @@ def main() -> None:
             campaign = json.loads(campaign_path.read_text())
             mode = campaign.get("math_objective_mode")
             if mode:
-                set_objective(workdir, mode=mode, goal=campaign.get("math_goal", ""))
+                goal = campaign.get("math_goal") or (workdir / "LAUNCH.md").read_text()
+                set_objective(workdir, mode=mode, goal=goal)
         env = os.environ.copy()
         env.update(MODEL_ENV)
         env["ARGUS_SKILL_RESEARCH_TARGET_LEVEL"] = target_level

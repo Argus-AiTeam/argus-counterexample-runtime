@@ -140,6 +140,7 @@ def test_launcher_applies_declared_audit_mode_before_manager_startup(tmp_path, m
     workdir = tmp_path / "campaigns" / "9100001"
     workdir.mkdir(parents=True)
     (workdir / "OBJECTIVE.md").write_text("Search for a source-bound erroneous lemma.")
+    (workdir / "LAUNCH.md").write_text("One source-bound erroneous lemma suffices.")
     (workdir / "campaign.json").write_text('{"math_objective_mode": "exploratory"}')
     persist_vertical(workdir, "math", research_target_level="exploratory")
     adopt_operator_objective(workdir, "Old full-paper audit goal")
@@ -155,3 +156,4 @@ def test_launcher_applies_declared_audit_mode_before_manager_startup(tmp_path, m
     launcher.main()
 
     assert resolve_objective(workdir).mode == "exploratory"
+    assert resolve_objective(workdir).goal == "One source-bound erroneous lemma suffices."
