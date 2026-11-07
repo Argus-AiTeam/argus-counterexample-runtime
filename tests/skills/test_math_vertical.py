@@ -157,7 +157,7 @@ def test_math_vertical_contains_only_contract_skills_and_metadata() -> None:
     # process launcher. It adds no stage and no required file, and nothing loads
     # it unless someone types `submit`.
     # `check` is the delivery gate made runnable before delivery (spec
-    # docs/MATH_SPEC.zh-CN.md §4, §9.1). It holds no rule of its own: it calls
+    # docs/MATH_SPEC.zh-CN.md §4, §10.1). It holds no rule of its own: it calls
     # `stages.stage_completion_issues` and prints the answer, so an agent sees
     # the refusal before submitting instead of after. It adds no stage and no
     # required file.

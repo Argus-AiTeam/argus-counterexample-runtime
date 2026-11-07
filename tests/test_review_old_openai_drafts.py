@@ -33,7 +33,13 @@ def test_all_old_artifacts_are_inputs_not_predetermined_results(tmp_path):
     assert "status" not in manifest
     assert proof.read_text() == "Old proof whose validity has not been decided."
     assert json.loads((root / "campaign.json").read_text())["math_objective_mode"] == "exploratory"
-    assert "One reviewed unit is not" in (root / "OBJECTIVE.md").read_text()
+    objective = (root / "OBJECTIVE.md").read_text()
+    # Spec §1 (the mission): the OpenAI papers are the subject, errors,
+    # deficiencies and advances are findings, and there is no quota.
+    assert "The subject is the OpenAI manuscripts of this family" in objective
+    assert "There is no\nquota" in objective or "There is no quota" in objective
+    assert "GUIDE.md" in objective and "FAMILY_REPORT.md" in objective
+    assert "Verify and explain" in (root / "LAUNCH.md").read_text()
     assert materialize(tmp_path, snapshot) == queue
 
 

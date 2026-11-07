@@ -1,4 +1,4 @@
-"""``math check`` is the delivery gate run early, not a second rulebook (spec §4, §9.1)."""
+"""``math check`` is the delivery gate run early, not a second rulebook (spec §4, §10.1)."""
 from __future__ import annotations
 
 import io

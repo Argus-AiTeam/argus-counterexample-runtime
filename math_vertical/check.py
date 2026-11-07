@@ -1,6 +1,6 @@
 """``math check``: the delivery gate, runnable before delivery.
 
-Spec ``docs/MATH_SPEC.zh-CN.md`` §4 and §9.1: a delivery with open issues is
+Spec ``docs/MATH_SPEC.zh-CN.md`` §4 and §10.1: a delivery with open issues is
 refused. The refusal itself is ``stages.stage_completion_issues`` at the final
 stage; this command runs exactly that function, so an Engineer or Reviewer sees
 what the gate will say before submitting instead of learning it from a hold.
