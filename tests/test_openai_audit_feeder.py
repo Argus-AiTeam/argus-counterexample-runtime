@@ -54,6 +54,45 @@ def test_native_certificate_is_authoritative(audit_fleet, monkeypatch):
     assert feeder.is_campaign_finished("9100001")
 
 
+def test_draining_prior_phase_keeps_its_capacity_reserved(audit_fleet, monkeypatch):
+    feeder.STATE_PATH.write_text(json.dumps({"draining_campaigns": ["old-campaign"]}))
+    monkeypatch.setattr(
+        feeder, "get_daemon_pid", lambda cid: 123 if cid == "old-campaign" else None
+    )
+    monkeypatch.setattr(
+        feeder.subprocess, "run", lambda *args, **kwargs: pytest.fail("capacity is occupied")
+    )
+
+    state = feeder.tick()
+
+    assert state["active"] == []
+    assert state["draining_campaigns"] == ["old-campaign"]
+    assert state["occupied_count"] == 1
+
+
+def test_exited_prior_phase_releases_capacity_without_becoming_a_result(
+    audit_fleet, monkeypatch,
+):
+    feeder.STATE_PATH.write_text(json.dumps({"draining_campaigns": ["old-campaign"]}))
+    launches = []
+
+    def launch(*args, **kwargs):
+        launches.append(args[0])
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(feeder.subprocess, "run", launch)
+    monkeypatch.setattr(
+        feeder, "get_daemon_pid",
+        lambda cid: 123 if cid == "9100001" and launches else None,
+    )
+
+    state = feeder.tick()
+
+    assert state["active"] == ["9100001"]
+    assert state["draining_campaigns"] == []
+    assert state["completed"] == []
+
+
 def test_reviewed_negative_audit_certifies_and_releases_a_fleet_slot(audit_fleet, monkeypatch):
     from argus_skill.core.models import ReviewDecision
     from argus_skill.manager import Manager

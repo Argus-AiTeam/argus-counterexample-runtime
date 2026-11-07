@@ -82,7 +82,11 @@ def tick() -> dict:
             currently_running.append(cid)
             sync_project_evolution_library(MASTER_HOME, BATCH_ROOT / "campaigns" / cid)
 
-    slots_needed = max(0, TARGET_CONCURRENCY - len(currently_running))
+    draining = [
+        cid for cid in state.get("draining_campaigns", [])
+        if get_daemon_pid(cid) is not None
+    ]
+    slots_needed = max(0, TARGET_CONCURRENCY - len(currently_running) - len(draining))
     newly_launched = []
     launch_failures = {}
     if slots_needed > 0:
@@ -132,6 +136,9 @@ def tick() -> dict:
         "model": "gpt-6.1-sol",
         "active_count": len(currently_running),
         "active": currently_running,
+        "draining_campaigns": draining,
+        "draining_count": len(draining),
+        "occupied_count": len(currently_running) + len(draining),
         "completed_count": len(completed),
         "completed": sorted(completed),
         "newly_launched": newly_launched,
@@ -152,7 +159,8 @@ def main() -> None:
             st = tick()
             print(
                 f"[{st['updated_at']}] active={st['active_count']}/{st['target_concurrency']} "
-                f"completed={st['completed_count']}/{st['total_queue']} newly_launched={st['newly_launched']}",
+                f"completed={st['completed_count']}/{st['total_queue']} "
+                f"draining={st['draining_count']} newly_launched={st['newly_launched']}",
                 flush=True,
             )
         except Exception as exc:
