@@ -34,6 +34,42 @@ section numbers below refer to it. Where this file and the spec disagree, the sp
 - A finite check is evidence for the finite statement only. Pushing a search further is not
   progress toward a general claim (§3 I5).
 
+## The proof map: PROOF.md (§2)
+
+Each project keeps one `PROOF.md` at its root. It is how the proof is organized, and it is
+written for people:
+
+- **Goal**: the statement, quoted, with where it comes from.
+- **Skeleton**: the main steps in order, and which lemmas each step uses.
+- **Lemmas**: one line each, saying what it states, where it comes from (the paper, ours, an
+  earlier draft, the literature), its status, and the file holding the evidence. The status is
+  one of: proved in Lean, checked by computation, checked by hand, open, refuted. "Proved in
+  Lean" needs a Lean file that passes `math-lean-verify` (§3 I1).
+- **Routes given up**: what was tried and why it was dropped, so nobody tries it again.
+
+Read it before starting; change it whenever the proof changes. When several people work in
+parallel, each takes lemmas from it. It is the skeleton of the report: the report explains,
+step by step, what the map lists. For example:
+
+```markdown
+# Goal
+Theorem 1.1 of `paper.tex` (sec. 1): I(sign p) ≤ 8d√n for every degree-d PTF on n variables.
+
+# Skeleton
+1. Reduce sensitivity to a coupling of two equal-marginal binomials (paper, Lemma 5.2).
+2. Bound E(U−V)² for that coupling (paper, Lemma 2.1: ≤ 8aσ) — the step we improve.
+3. Combine: I ≤ 2·E(U−V)².
+
+# Lemmas
+- L2.1' (ours): E(U−V)² ≤ 4a·E|U−c| for every c — proved in Lean (`coupling/Main.lean`);
+  improves the paper's Lemma 2.1, giving I(sign p) ≤ 4d√n.
+- Constant 4 is optimal (ours) — checked by computation (`coupling/verify.py`).
+- Lemma 5.2 (paper) — checked by hand; used unchanged.
+
+# Routes given up
+- Bounding E(U−V)² through the variance alone: loses the factor 2 we need.
+```
+
 ## Where each claim comes from (§2)
 
 - Every claim in a report says whose it is: the paper's (with file and theorem number), ours,
@@ -76,7 +112,7 @@ main line in a quarter of an hour and be able to check the key steps themselves 
   theorem, to evidence by file path.
 - A caveat appears once, where it would change what the reader does. Disclaimers repeated in
   every paragraph, pre-emptive defences and scope boilerplate are written out of the report.
-- Write each fact once. The report is the record; no plans, audits or status files beside it (§7).
+- Write each fact once. The report and `PROOF.md` are the record; no plans, audits or other status files beside them (§7).
 
 ## Lean
 
@@ -101,7 +137,8 @@ main line in a quarter of an hour and be able to check the key steps themselves 
 
 Read the report as the colleague it is written for.
 
-- Rerun the Lean and the computations the conclusion rests on yourself.
+- Rerun the Lean and the computations the conclusion rests on yourself, and check that every
+  status in `PROOF.md` matches its evidence.
 - Check every "the paper is wrong" against the sentence it points to, and every improvement
   against the paper's actual statement: misquoting the baseline is the most common mistake.
 - Ask whether the improvement is already implied by the paper's own proof or only changes a
