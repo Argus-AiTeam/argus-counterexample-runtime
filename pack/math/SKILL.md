@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.5.0
+version: 0.6.0
 setup: setup/install
 ---
 
@@ -14,10 +14,11 @@ section numbers below refer to it. Where this file and the spec disagree, the sp
   making a paper easier to understand, and proving something that matters. A checked result
   nobody can read has not done its job.
 - When the work is someone else's paper (review mode), every paper gets a reader's guide and a
-  verdict. Along the way three kinds of finding count: an error (a false statement, lemma or
-  citation), a shortcoming (a missing hypothesis, a gap, an overstated claim), and an advance (a
-  stronger or more general result, a simpler proof, a gap closed). None is produced on demand:
-  "no problem found in the parts I checked" is a result, stated with what was checked.
+  verdict in three parts: improvements, errors and shortcomings, and what was verified (below).
+- Checking is not the end. Once the main line is checked, spend real effort going past the
+  paper: a sharper constant or exponent, a weaker hypothesis, a generalization, an optimality
+  example, a simpler proof, a gap closed. Plan for it as a task of its own. Nothing is produced
+  on demand: when the push gets nowhere, say what was tried.
 - Earlier drafts, ours or anyone's, are claims to check, not results to count.
 
 ## Pin down the statement first
@@ -64,7 +65,17 @@ itself should be noticeably easier. Write it whether or not you find anything wr
 - **The paper's own Lean**, if any: what is formalized, how it relates to the theorems in the
   text, and what it leaves out.
 
-The verdict (holds, wrong, gap, improved, open) follows in its own section.
+The verdict follows in its own section, in three parts, always in this order:
+
+1. **Improvements**: each beside the paper's statement, saying which step changes, and whether
+   its key step was checked independently (Lean, computation, or a second person by hand) or is
+   only plausible on reading.
+2. **Errors and shortcomings**: false statements, lemmas or citations; missing hypotheses, gaps,
+   overstated claims. Each points to the sentence of the paper and comes with the smallest
+   example.
+3. **Verified**: what holds, which parts were checked and how.
+
+A part with nothing in it says "none" and what was looked at. The claims table closes the verdict.
 
 ## The report is the record (§2)
 
@@ -94,8 +105,14 @@ For example, the verdict section of a guide might read:
 ```markdown
 ## Verdict
 The paper's bound holds, and its constant can be halved: I(sign p) ≤ 4d√n (paper: 8d√n).
-The reduction is the paper's; the new step is a sharper coupling bound, and the rest follows
-as in the paper's Section 5.
+
+**Improvements.** I(sign p) ≤ 4d√n against the paper's 8d√n. The reduction is the paper's; the
+new step is a sharper coupling bound (proved in Lean), and the rest follows as in Section 5.
+
+**Errors and shortcomings.** None found. Looked at: every step of Sections 2–5, the constants
+in Section 6, the cited results the corollaries use.
+
+**Verified.** Theorem 1 and both corollaries, by hand, step by step.
 
 | Claim | Source | Basis | Evidence |
 |---|---|---|---|
