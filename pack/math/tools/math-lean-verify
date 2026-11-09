@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""math-lean-verify: compile Lean files against the pack's Mathlib and say plainly what came out.
+
+For each file: does it compile; does any declaration use `sorry`; which axioms each theorem rests
+on beyond Lean's standard three (propext, Classical.choice, Quot.sound), including the ones
+`native_decide` adds; does it switch off kernel checking. One compile per file.
+
+    math-lean-verify path/to/Main.lean [more.lean ...] [--timeout SECONDS]
+
+Exit status: 0 every file passes; 1 some file fails mathematically (does not compile, sorry,
+extra axioms); 2 some file could not be verified here (no Mathlib, missing module, timeout).
+Nothing is recorded; the output is for the reader. The Mathlib workspace is $MATH_LEAN_WORKSPACE.
+"""
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+STANDARD = {"propext", "Classical.choice", "Quot.sound"}
+DECL = re.compile(r"^\s*(?:@\[[^\]]*\]\s*)*(?:private\s+|protected\s+|noncomputable\s+)*(theorem|lemma)\s+([^\s:(\[{]+)", re.M)
+NAMESPACE = re.compile(r"^\s*namespace\s+(\S+)", re.M)
+LOCAL_AXIOM = re.compile(r"^\s*(?:private\s+)?axiom\s+([^\s:(\[{]+)", re.M)
+ENVIRONMENT = re.compile(r"unknown module prefix|unknown package|object file .* does not exist|could not resolve 'HEAD'|No directory '", re.I)
+
+
+def lake() -> str:
+    for candidate in (os.environ.get("ELAN_HOME", "") + "/bin/lake", str(Path.home() / ".elan/bin/lake")):
+        if candidate.startswith("/") and os.access(candidate, os.X_OK):
+            return candidate
+    return "lake"
+
+
+def run(args, cwd, timeout):
+    try:
+        done = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        return done.returncode, done.stdout + done.stderr
+    except subprocess.TimeoutExpired:
+        return None, ""
+
+
+def explain(axiom: str) -> str:
+    if "native_decide" in axiom or axiom in ("Lean.ofReduceBool", "Lean.trustCompiler"):
+        return f"{axiom} (from native_decide: trusts compiled code; use decide, or say so in words)"
+    if axiom == "sorryAx":
+        return "sorryAx (a sorry somewhere underneath)"
+    return axiom
+
+
+def verify(path: Path, workspace: Path, timeout: int) -> int:
+    """0 passes, 1 fails mathematically, 2 could not be verified here."""
+    name = str(path)
+    if not path.is_file():
+        print(f"{name}: no such file.")
+        return 2
+    source = path.read_text(errors="replace")
+    if re.search(r"set_option\s+debug\.skipKernelTC", source):
+        print(f"{name}: switches off kernel type checking (debug.skipKernelTC); not accepted as a proof.")
+        return 1
+    decls = [m[1] for m in DECL.findall(source)]
+    namespaces = " ".join(dict.fromkeys(NAMESPACE.findall(source)))
+    opener = f"open {namespaces} in " if namespaces else ""
+    original_lines = source.count("\n") + 1
+    probe = source + "\n\n" + "".join(f"{opener}#print axioms {d}\n" for d in decls)
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = Path(tmp) / path.name
+        copy.write_text(probe)
+        code, out = run([lake(), "env", "lean", str(copy)], workspace, timeout)
+    if code is None:
+        print(f"{name}: not verified here: compiling did not finish within {timeout} s.")
+        return 2
+    out = out.replace(str(copy), name)
+    errors = []
+    for line in out.splitlines():
+        m = re.match(r"^.*?:(\d+):\d+: error", line)
+        if m and int(m.group(1)) <= original_lines:
+            errors.append(line)
+    if ENVIRONMENT.search(out) and errors:
+        print(f"{name}: not verified here: the environment lacks a module it imports.")
+        for line in errors[:3]:
+            print("  " + line.replace(name + ":", "line "))
+        return 2
+    if errors:
+        print(f"{name}: does not compile.")
+        for line in errors[:8]:
+            print("  " + line.replace(name + ":", "line "))
+        if len(errors) > 8:
+            print(f"  … {len(errors) - 8} more errors")
+        return 1
+    sorry_count = len(re.findall(r"declaration uses [`'\"]sorry[`'\"]", out))
+    extra = {}
+    for who, axioms in re.findall(r"^'([^']+)' depends on axioms: \[([^\]]*)\]", out, re.M):
+        odd = [a.strip() for a in axioms.split(",") if a.strip() and a.strip() not in STANDARD]
+        if odd:
+            extra[who] = odd
+    local = LOCAL_AXIOM.findall(source)
+    problems = []
+    if sorry_count:
+        problems.append(f"{sorry_count} declaration(s) use sorry")
+    if local:
+        problems.append("declares axioms: " + ", ".join(local))
+    for who, odd in extra.items():
+        problems.append(f"{who} rests on " + ", ".join(explain(a) for a in odd))
+    sample = ", ".join(decls[:5]) + (f", … ({len(decls)} in all)" if len(decls) > 5 else "")
+    if problems:
+        print(f"{name}: compiles, but:")
+        for p in problems:
+            print("  - " + p)
+        return 1
+    print(f"{name}: compiles; no sorry; its theorems rest only on Lean's standard axioms.")
+    if decls:
+        print(f"  Theorems and lemmas: {sample}")
+    return 0
+
+
+def main(argv):
+    timeout = 1800
+    files = []
+    args = iter(argv)
+    for arg in args:
+        if arg == "--timeout":
+            timeout = int(next(args))
+        elif arg in ("-h", "--help"):
+            print(__doc__.strip())
+            return 0
+        else:
+            files.append(Path(arg).resolve())
+    if not files:
+        print(__doc__.strip())
+        return 2
+    workspace = Path(os.environ.get("MATH_LEAN_WORKSPACE", "")).expanduser()
+    if not (workspace / "lakefile.toml").is_file() and not (workspace / "lakefile.lean").is_file():
+        print("Not verified: MATH_LEAN_WORKSPACE is unset or has no lakefile. Run the pack's setup.")
+        return 2
+    _, version = run([lake(), "env", "lean", "--version"], workspace, 120)
+    print(f"Lean: {version.strip() or 'unknown'} · workspace {workspace}")
+    worst = 0
+    for path in files:
+        result = verify(path, workspace, timeout)
+        worst = 1 if 1 in (worst, result) else max(worst, result)
+    return worst
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

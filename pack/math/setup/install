@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Installs what the math pack's tools need into ARGUS_PACK_HOME: elan, Lean 4.31.0 and a Mathlib
+# workspace pinned to one commit, plus the tools themselves. Runs once per pack version.
+#
+# Optional: MATH_PACK_MATHLIB_FROM=<an existing workspace with the same Lean and Mathlib> copies its
+# built packages instead of downloading the Mathlib cache (about 5 GB).
+set -euo pipefail
+
+LEAN_VERSION="v4.31.0"
+MATHLIB_REV="fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
+JACOBIAN_VERSION="0.23.0"
+HOME_DIR="${ARGUS_PACK_HOME:?ARGUS_PACK_HOME is not set}"
+PACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"   # the pack root; ARGUS_PACK_DIR is the setup/ folder
+export ELAN_HOME="$HOME_DIR/elan"
+export PATH="$ELAN_HOME/bin:$PATH"
+
+echo "== tools"
+mkdir -p "$HOME_DIR/bin"
+cp "$PACK_DIR/tools/math-lean-verify" "$PACK_DIR/tools/math-cite" "$PACK_DIR/tools/math-ops" "$HOME_DIR/bin/"
+chmod +x "$HOME_DIR/bin/math-lean-verify" "$HOME_DIR/bin/math-cite" "$HOME_DIR/bin/math-ops"
+
+echo "== elan and Lean $LEAN_VERSION"
+if [ ! -x "$ELAN_HOME/bin/elan" ]; then
+  curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o "$HOME_DIR/elan-init.sh"
+  sh "$HOME_DIR/elan-init.sh" -y --no-modify-path --default-toolchain none
+fi
+elan toolchain install "leanprover/lean4:$LEAN_VERSION"
+
+echo "== Mathlib workspace at $MATHLIB_REV"
+WS="$HOME_DIR/mathlib"
+mkdir -p "$WS"
+echo "leanprover/lean4:$LEAN_VERSION" > "$WS/lean-toolchain"
+cat > "$WS/lakefile.toml" <<EOF
+name = "math_pack_workspace"
+version = "0.1.0"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "$MATHLIB_REV"
+EOF
+cd "$WS"
+if [ -d .lake/packages/mathlib ] && [ -f lake-manifest.json ]; then
+  echo "Mathlib already in place"
+elif [ -n "${MATH_PACK_MATHLIB_FROM:-}" ] && [ -d "$MATH_PACK_MATHLIB_FROM/.lake/packages/mathlib" ]; then
+  echo "copying built packages from $MATH_PACK_MATHLIB_FROM"
+  mkdir -p .lake
+  cp -a "$MATH_PACK_MATHLIB_FROM/.lake/packages" .lake/
+  cp "$MATH_PACK_MATHLIB_FROM/lake-manifest.json" .
+else
+  lake update
+  lake exe cache get
+fi
+
+echo "== Jacobian $JACOBIAN_VERSION (typed exact operations)"
+PY=""
+for candidate in python3.13 python3.12 python3; do
+  if command -v "$candidate" >/dev/null && "$candidate" -c 'import sys; sys.exit(0 if (3,12) <= sys.version_info[:2] < (3,14) else 1)'; then PY="$(command -v "$candidate")"; break; fi
+done
+if [ -z "$PY" ]; then echo "Jacobian needs Python 3.12 or 3.13; none found on PATH." >&2; exit 1; fi
+if [ ! -x "$HOME_DIR/jacobian/bin/jacobian" ]; then
+  "$PY" -m venv "$HOME_DIR/jacobian"
+  "$HOME_DIR/jacobian/bin/pip" install --quiet "jacobian==$JACOBIAN_VERSION"
+fi
+"$HOME_DIR/jacobian/bin/jacobian" catalog | "$PY" -c 'import json,sys; n=len(json.load(sys.stdin)["operations"]); print(f"{n} operations"); sys.exit(0 if n else 1)'
+
+echo "== check"
+printf 'import Mathlib\nexample : (2 : ℕ) + 2 = 4 := by norm_num\n' > "$HOME_DIR/smoke.lean"
+lake env lean "$HOME_DIR/smoke.lean"
+
+cat > "$HOME_DIR/env" <<'EOF'
+PATH=${ARGUS_PACK_HOME}/bin:${ARGUS_PACK_HOME}/elan/bin:${PATH}
+ELAN_HOME=${ARGUS_PACK_HOME}/elan
+MATH_LEAN_WORKSPACE=${ARGUS_PACK_HOME}/mathlib
+MATH_JACOBIAN=${ARGUS_PACK_HOME}/jacobian/bin/jacobian
+EOF
+echo "ready"

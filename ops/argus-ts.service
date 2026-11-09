@@ -1,0 +1,19 @@
+# Argus (ts-core) with the math pack, as a user service.
+# Install:  cp ops/argus-ts.service ~/.config/systemd/user/ && systemctl --user daemon-reload && systemctl --user enable --now argus-ts
+# Page:     ssh -L 8799:127.0.0.1:8799 <server>, then open the address in `journalctl --user -u argus-ts | grep 'Argus is at'`
+[Unit]
+Description=Argus (ts-core) with the math pack, web page on 127.0.0.1:8799
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=/home/argustest
+Environment=PATH=/home/argustest/.nvm/versions/node/v22.23.1/bin:/home/argustest/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=ARGUS_HOME=/home/argustest/.argus
+Environment=MATH_PACK_MATHLIB_FROM=/home/argustest/.local/share/argus-skill/mathlib-v4.31.0
+ExecStart=/home/argustest/.nvm/versions/node/v22.23.1/bin/argus --backend copilot --model gpt-6.1-sol --host 127.0.0.1 --port 8799
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

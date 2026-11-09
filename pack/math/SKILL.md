@@ -1,0 +1,239 @@
+---
+name: math
+description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
+version: 0.4.0
+setup: setup/install
+---
+
+Derived from the Argus Math spec (`docs/MATH_SPEC.zh-CN.md` in Argus-AiTeam/argus-counterexample-runtime);
+section numbers below refer to it. Where this file and the spec disagree, the spec wins.
+
+## What the work is for (§1)
+
+- The goal is mathematics another person can understand and check. Two things count equally:
+  making a paper easier to understand, and proving something that matters. A checked result
+  nobody can read has not done its job.
+- When the work is someone else's paper (review mode), every paper gets a reader's guide and a
+  verdict. Along the way three kinds of finding count: an error (a false statement, lemma or
+  citation), a shortcoming (a missing hypothesis, a gap, an overstated claim), and an advance (a
+  stronger or more general result, a simpler proof, a gap closed). None is produced on demand:
+  "no problem found in the parts I checked" is a result, stated with what was checked.
+- Earlier drafts, ours or anyone's, are claims to check, not results to count.
+
+## Pin down the statement first
+
+- Write the exact statement at the top of the report before any other work: the objects and
+  their domains, the order of quantifiers, normalizations and conventions (which norm, whether 0
+  is a natural number, up to which equivalence, which asymptotic regime). Most wrong
+  conclusions start from a statement read slightly differently.
+- A statement that fails only under a literal misreading or a transcription slip is a scope
+  correction, not a refutation; report it as one.
+
+## Reading a paper
+
+- Start from the main theorem and find the few steps it stands on: the estimate everything feeds
+  into, the construction a counterexample rests on, the lemma whose hypotheses are tight. Spend
+  the effort there; routine steps get a sentence (§7).
+- Check those steps as a referee would: redo the computation, test the inequality on cases,
+  look for the hypothesis a step quietly uses. When a step is a finite statement, compute it;
+  when a doubt can be settled in Lean at reasonable cost, write the Lean.
+- Fill the steps the paper skips. A filled step is part of the result: it is often what makes
+  the paper readable.
+- Before calling something a gap, check whether the paper handles it elsewhere: a later
+  section, a cited lemma, an appendix. Many apparent gaps are answered three pages on.
+
+## Explaining the paper: the reader's guide (§2, review mode)
+
+The guide is for a colleague who wants to understand the paper. After reading it, the paper
+itself should be noticeably easier. Write it whether or not you find anything wrong.
+
+- **The problem and the result**, in a paragraph: what question the paper answers, why it is
+  worth answering, and what the main theorem says, in language the reader already knows rather
+  than the paper's private notation.
+- **A roadmap**: what each section does, how they connect into the main line, which sections a
+  first reading can skip.
+- **The core idea**: the one or two ideas the paper turns on, with the intuition behind them.
+  Where a smallest example exists, work it out by hand; one example often explains more than a
+  page of proof.
+- **Notation**: a short table for symbols that are unusual or mean something specific here.
+- **The hard passages**: for each of the few places a reader will get stuck, say what it is
+  doing and why it is done that way, and write out the steps the paper skips, marked "omitted in
+  the paper".
+- **What the paper relies on**: each outside result it uses, what it says, what it does in this
+  argument, and whether the reader needs to look it up.
+- **The paper's own Lean**, if any: what is formalized, how it relates to the theorems in the
+  text, and what it leaves out.
+
+The verdict (holds, wrong, gap, improved, open) follows in its own section.
+
+## The report is the record (§2)
+
+The report is the one place where the proof stands: its structure, and what each step rests on.
+Nothing else keeps a second copy, so nothing can disagree with it. While the work goes on, the
+report is the draft being written; read it before you start, and change it when the proof
+changes. In review mode the report is the reader's guide followed by the verdict.
+
+- **The statement** at the top, pinned down as above, quoted, with where it comes from.
+- **The skeleton**: the main steps in order, and which lemmas each uses.
+- **Each step says whose it is and what it rests on**: proved in Lean (with the file); checked by
+  computation (with the script); checked by hand; conditional on a cited result (the work,
+  version and theorem); open; or refuted. "Proved in Lean" needs a file that passes
+  `math-lean-verify` (§3 I1). When a definition changes, every step stated with it is checked
+  again.
+- Progress means a step's basis got stronger. Checking a finite case at a larger bound moves
+  nothing (§3 I5), and ruling out one sufficient criterion does not settle the question.
+- **Routes given up** go in the team wiki, not the report: what was tried, what killed it, and
+  whether the idea is wrong or only unfinished. Two routes that die of the same obstruction were
+  one route. Look there before trying a route.
+- Settle what is already known before several people split the work, so the search is paid for
+  once; the Planner splits the work into tasks and the letters carry it.
+
+For example, the verdict section of a guide might read:
+
+```markdown
+## Verdict
+The paper's bound holds, and its constant can be halved: I(sign p) ≤ 4d√n (paper: 8d√n).
+
+1. Reduction to a coupling of two equal-marginal binomials — the paper's Lemma 5.2, checked by
+   hand; used unchanged.
+2. The coupling bound — ours: E(U−V)² ≤ 4a·E|U−c| for every c, proved in Lean
+   (`coupling/Main.lean`), where the paper's Lemma 2.1 has 8aσ. The constant 4 cannot be
+   lowered: checked by computation (`coupling/verify.py`).
+3. Combining as in the paper's Section 5 gives the bound.
+```
+
+## Where each claim comes from (§2)
+
+- Every claim says whose it is: the paper's (with file and theorem number), ours, an earlier
+  draft's, or the literature's (with the work, version and theorem number).
+- "The paper is wrong" points to a sentence of the paper. Refuting a shortcut, extension or
+  attack we proposed ourselves is not an error in the paper; say plainly that the paper does not
+  claim it.
+- A Lean file that ends in `sorry` may be a statement left for others to prove (OpenAI's
+  `lean/ComparatorChallenges/` are such statements; their proofs live under `lean/OAI/`). Look
+  for the proof before reporting a missing one.
+
+## Counterexamples and computations
+
+- A counterexample is checked against every hypothesis of the original statement, not against
+  your reformulation of it.
+- Use exact arithmetic: integers, rationals, exact algebraic numbers, or interval arithmetic
+  with rigorous bounds. Ship a short script that reads the witness from a file and rechecks it.
+  Floating-point agreement, a near-solution, a long search, a timeout or a solver's UNKNOWN is
+  not a result.
+- A checker is only as good as what it rejects. Before relying on a verification script, feed it
+  a few deliberately broken inputs (a flipped sign, an off-by-one bound, a witness that breaks
+  one hypothesis) and confirm it rejects each one; say in the report that it did.
+- A SAT answer counts once the assignment is expanded and checked against the original
+  mathematical conditions, not only the encoding. A bare UNSAT is not a refutation without a
+  checked proof certificate or a Lean proof.
+
+## Exact operations: Jacobian
+
+`math-ops` gives the Jacobian library: about six hundred typed, bounded operations (exact
+linear algebra over Z and Q, Smith and Hermite forms, lattices and abelian groups, polynomial
+and number-theoretic computations, LP and SAT/SMT checks with certificates, graph invariants,
+simplicial homology, and more).
+
+- `math-ops find smith normal form` lists the operations that match; `math-ops show <id>` gives
+  the exact input it takes and what it guarantees; `math-ops run <id> payload.json` runs it.
+- Reach for it when a step reduces to a finite, well-typed computation that a hand calculation
+  would make error-prone: a determinant over Z, an invariant factor, a feasibility certificate.
+  It does not decide what the step means; you still say why this computation settles it.
+- Keep the payload file next to the report and cite the command: anyone can rerun it, and it
+  counts as computational evidence. Prefer an operation whose result carries a certificate
+  ("certified" in its id) when the conclusion rests on it.
+- A result marked approximate, incomplete, unknown or timed out settles nothing.
+
+## Writing for a reader (§2, §3 I8)
+
+This applies to the guide, the verdict and to papers about our own results. The reader is a
+mathematician in the field who has not read the paper: they should grasp the main line in a
+quarter of an hour and be able to check the key steps in an hour.
+
+- The first sentence gives the verdict or result in plain words.
+- Then the mathematics in the order a person understands it: the statement, quoted and
+  located; the idea of the proof and where the difficulty lies; the skeleton; the details of the
+  steps that carry the weight.
+- When a step uses a lemma or an outside theorem, say there what it does in this step, not only
+  its number.
+- An improvement shows the paper's statement and the new one side by side and says which step
+  changes.
+- An error comes with the smallest example that shows it, worked out or as a computation anyone
+  can rerun, and the exact step where it bites.
+- Each conclusion names the kind of evidence it rests on: Lean, computation, literature or
+  judgement (§2). Only Lean makes something "proved" (§3 I1).
+- What a Lean proof establishes is said in words next to the Lean, so the reader need not read
+  Lean to know what was checked.
+- No internal identifiers, ledger names or claim numbers. Point to the paper by section and
+  theorem, to evidence by file path.
+- A caveat appears once, where it would change what the reader does. Repeated disclaimers,
+  pre-emptive defences and scope boilerplate are written out.
+- Write each fact once. The report is the record; no plans, audits or status files beside it (§7).
+
+## Is it new?
+
+- Before calling an advance new, remove everything the cited theorems already imply and say what
+  remains. A parameter choice, a worked example, a certificate, a constant made explicit, or a
+  direct corollary of a known theorem is a confirmation, not an advance.
+- Check whether the paper's own proof already gives the "improvement": it often does.
+- "No prior result found" names what was searched and when; it is not evidence of novelty.
+
+## Lean
+
+- `math-lean-verify path/to/Main.lean` compiles against Lean 4.31.0 and the pinned Mathlib and
+  says, in words, whether any declaration uses `sorry` and which axioms each theorem rests on
+  beyond Lean's standard three. Only a file that passes counts as Lean evidence. Exit status 2
+  means the file could not be verified here (missing module, timeout): neither a proof nor a
+  failure.
+- Prefer `decide` to `native_decide`; the latter trusts compiled code and is reported as such.
+- Keep a proof in one file where you can. Do not create a lakefile at the project root: it hides
+  the prebuilt Mathlib and starts a rebuild of several gigabytes.
+- Next to each Lean file, a short `statement_fidelity.md` says what the formal statement is, how
+  it matches the paper's, and what it leaves out (§3 I2). Watch the usual traps: natural-number
+  subtraction stops at zero, `x / 0 = 0`, where a coercion sits, and hypotheses that can never
+  hold make a theorem vacuous, so instantiate one example to show they can.
+- A compiled certificate of a local identity does not certify the surrounding geometry or the
+  paper. Lean is worth writing where it settles a doubt: an inequality with fiddly constants, a
+  finite case analysis, an algebraic identity. Line counts are not results, and a port of
+  someone else's Lean is reported as a port.
+
+## Citations
+
+- `math-cite <arXiv id or DOI>` fetches what is openly available, prints the version you have,
+  and for a DOI looks for an arXiv preprint of the same title.
+- Check three things for each cited result: the source says it in the version you read; each
+  of its hypotheses holds in your setting; its symbols mean here what they mean there (the same
+  letter in two papers can name different objects). Applying a theorem outside its hypotheses
+  is an error even when the theorem is true.
+- Quote the proposition with its number and version (§3 I3). A DOI that resolves shows only that
+  the work exists; when the text cannot be had, say "could not check".
+
+## Earlier drafts
+
+Put each earlier draft in one category: holds and is new; holds and reproduces the paper;
+refutes only our own attack; invalid; open, with the gap named. When a review stops short, say
+which layer failed: the argument, the decomposition, or the whole approach.
+
+## For the Reviewer
+
+Read the work as the colleague it is written for.
+
+- Rerun the Lean and the computations the conclusion rests on, and check that what the report
+  says each step rests on matches its evidence.
+- Check every "the paper is wrong" against the sentence it points to, and every improvement
+  against the paper's actual statement: misquoting the baseline is the most common mistake.
+- Ask whether an improvement is already implied by the paper's own proof or only changes a
+  constant nobody uses; if so, it is a confirmation.
+- Read the guide as someone new to the paper. A guide that does not make the paper easier, a
+  report you cannot follow, a buried verdict, or text leaning on disclaimers and identifiers
+  goes back for rewriting, the same as an error (§3 I8).
+- You do not accept your own work or your own citations (§3 I4).
+
+## What not to do
+
+- Do not modify Argus, this pack, the spec or the tools; report a problem with them to the
+  operator (§3 I7). The `argus-maintenance` skill is not for this work.
+- Do not change the task's goal or lower its bar; if the question itself is wrong, say so to the
+  operator (§3 I6).
+- Do not manufacture findings, and do not present unchecked parts as checked (§1).

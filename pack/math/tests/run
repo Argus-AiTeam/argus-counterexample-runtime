@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Checks math-lean-verify: one file that must pass, four that must be rejected.
+# Needs MATH_LEAN_WORKSPACE (the pack's setup sets it).
+set -u
+here="$(cd "$(dirname "$0")" && pwd)"
+verify="$here/../tools/math-lean-verify"
+fail=0
+"$verify" "$here/Passes.lean" >/dev/null || { echo "FAIL: Passes.lean was rejected"; fail=1; }
+for f in SorryRejected AdmitRejected MetaAxiomRejected NativeDecideRejected; do
+  if "$verify" "$here/$f.lean" >/dev/null; then echo "FAIL: $f.lean was accepted"; fail=1; fi
+done
+[ $fail = 0 ] && echo "all checks behave as expected"
+exit $fail
