@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/spec-v0.15-1f6feb?style=flat-square" alt="spec v0.15">
+  <img src="https://img.shields.io/badge/spec-v0.18-1f6feb?style=flat-square" alt="spec v0.18">
   <img src="https://img.shields.io/badge/core-Argus%20ts--core-24292f?style=flat-square" alt="Argus ts-core">
   <img src="https://img.shields.io/badge/Lean-4.31.0%20%2B%20Mathlib-6f42c1?style=flat-square" alt="Lean 4.31.0">
   <img src="https://img.shields.io/badge/Jacobian-0.23.0-2da44e?style=flat-square" alt="Jacobian 0.23.0">
@@ -51,19 +51,20 @@ flowchart LR
   R -- send back --> E
   R -- accepted --> M
   M -- letter + report --> O
-  E -. uses .-> T{{math-lean-verify<br/>math-cite<br/>math-ops}}
+  E -. uses .-> T{{math-lean-verify<br/>math-cite<br/>math-ops<br/>math-claims}}
   R -. reruns .-> T
 ```
 
 The **core** (Argus ts-core, in [`core/`](core/)) runs the four roles on a coding-agent CLI
 (Copilot, Codex, Claude Code or Pi), passes letters between them and keeps the record. The **math
-pack** ([`pack/math/`](pack/math/)) tells the team how to do mathematics and gives it three tools:
+pack** ([`pack/math/`](pack/math/)) tells the team how to do mathematics and gives it four tools:
 
 | Tool | What it gives |
 |---|---|
 | `math-lean-verify` | Compiles Lean against Mathlib; says plainly whether anything uses `sorry` and which axioms each theorem rests on |
 | `math-cite` | Fetches the cited work (arXiv, DOI) so the cited proposition is read in the version cited |
 | `math-ops` | About 1,800 typed exact operations from Jacobian: Smith forms, lattices, certified LP/SAT, homology… |
+| `math-claims` | Reads the claims tables back out of reports, sums them up, and can recompile the Lean behind them |
 
 ## What it holds to
 

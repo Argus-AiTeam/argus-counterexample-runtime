@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/spec-v0.15-1f6feb?style=flat-square" alt="spec v0.15">
+  <img src="https://img.shields.io/badge/spec-v0.18-1f6feb?style=flat-square" alt="spec v0.18">
   <img src="https://img.shields.io/badge/core-Argus%20ts--core-24292f?style=flat-square" alt="Argus ts-core">
   <img src="https://img.shields.io/badge/Lean-4.31.0%20%2B%20Mathlib-6f42c1?style=flat-square" alt="Lean 4.31.0">
   <img src="https://img.shields.io/badge/Jacobian-0.23.0-2da44e?style=flat-square" alt="Jacobian 0.23.0">
@@ -47,18 +47,19 @@ flowchart LR
   R -- 退回 --> E
   R -- 通过 --> M
   M -- 信 + 报告 --> O
-  E -. 使用 .-> T{{math-lean-verify<br/>math-cite<br/>math-ops}}
+  E -. 使用 .-> T{{math-lean-verify<br/>math-cite<br/>math-ops<br/>math-claims}}
   R -. 重跑 .-> T
 ```
 
 **内核**（Argus ts-core，在 [`core/`](core/)）在编程 Agent 命令行（Copilot、Codex、Claude Code 或 Pi）上运行四个角色，
-在角色之间传信、保存记录。**数学 pack**（[`pack/math/`](pack/math/)）告诉团队怎么做数学，并提供三个工具：
+在角色之间传信、保存记录。**数学 pack**（[`pack/math/`](pack/math/)）告诉团队怎么做数学，并提供四个工具：
 
 | 工具 | 作用 |
 |---|---|
 | `math-lean-verify` | 用 Mathlib 编译 Lean，直接说明有没有 `sorry`、每个定理依赖哪些公理 |
 | `math-cite` | 取回被引文献（arXiv、DOI），在所引的那个版本里读到被引的命题 |
 | `math-ops` | Jacobian 的约 1,800 种带类型的精确运算：Smith 标准形、格、带证书的 LP/SAT、同调…… |
+| `math-claims` | 从报告里读出命题表并汇总，可重新编译"Lean 已证"背后的文件 |
 
 ## 它坚持什么
 

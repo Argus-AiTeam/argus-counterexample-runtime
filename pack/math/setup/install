@@ -16,8 +16,8 @@ export PATH="$ELAN_HOME/bin:$PATH"
 
 echo "== tools"
 mkdir -p "$HOME_DIR/bin"
-cp "$PACK_DIR/tools/math-lean-verify" "$PACK_DIR/tools/math-cite" "$PACK_DIR/tools/math-ops" "$HOME_DIR/bin/"
-chmod +x "$HOME_DIR/bin/math-lean-verify" "$HOME_DIR/bin/math-cite" "$HOME_DIR/bin/math-ops"
+cp "$PACK_DIR/tools/math-lean-verify" "$PACK_DIR/tools/math-cite" "$PACK_DIR/tools/math-ops" "$PACK_DIR/tools/math-claims" "$HOME_DIR/bin/"
+chmod +x "$HOME_DIR/bin/math-lean-verify" "$HOME_DIR/bin/math-cite" "$HOME_DIR/bin/math-ops" "$HOME_DIR/bin/math-claims"
 
 echo "== elan and Lean $LEAN_VERSION"
 if [ ! -x "$ELAN_HOME/bin/elan" ]; then

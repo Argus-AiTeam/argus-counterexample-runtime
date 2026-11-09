@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.4.1
+version: 0.5.0
 setup: setup/install
 ---
 
@@ -75,11 +75,12 @@ changes. In review mode the report is the reader's guide followed by the verdict
 
 - **The statement** at the top, pinned down as above, quoted, with where it comes from.
 - **The skeleton**: the main steps in order, and which lemmas each uses.
-- **Each step says whose it is and what it rests on**: proved in Lean (with the file); checked by
-  computation (with the script); checked by hand; conditional on a cited result (the work,
-  version and theorem); open; or refuted. "Proved in Lean" needs a file that passes
-  `math-lean-verify` (§3 I1). When a definition changes, every step stated with it is checked
-  again.
+- **The claims table** closes the verdict: one row per claim, with four columns, Claim | Source
+  | Basis | Evidence. Source is the paper (with its location), ours, an earlier draft, or the
+  literature. Basis is one of: proved in Lean; checked by computation; checked by hand;
+  conditional on a cited result (name it); open; refuted. Evidence is a file path. "Proved in
+  Lean" needs a file that passes `math-lean-verify` (§3 I1). `math-claims` reads these tables
+  back. When a definition changes, the claims stated with it are checked again.
 - Progress means a step's basis got stronger. Checking a finite case at a larger bound moves
   nothing (§3 I5), and ruling out one sufficient criterion does not settle the question.
 - **Routes given up** go in the team wiki, not the report: what was tried, what killed it, and
@@ -93,13 +94,15 @@ For example, the verdict section of a guide might read:
 ```markdown
 ## Verdict
 The paper's bound holds, and its constant can be halved: I(sign p) ≤ 4d√n (paper: 8d√n).
+The reduction is the paper's; the new step is a sharper coupling bound, and the rest follows
+as in the paper's Section 5.
 
-1. Reduction to a coupling of two equal-marginal binomials — the paper's Lemma 5.2, checked by
-   hand; used unchanged.
-2. The coupling bound — ours: E(U−V)² ≤ 4a·E|U−c| for every c, proved in Lean
-   (`coupling/Main.lean`), where the paper's Lemma 2.1 has 8aσ. The constant 4 cannot be
-   lowered: checked by computation (`coupling/verify.py`).
-3. Combining as in the paper's Section 5 gives the bound.
+| Claim | Source | Basis | Evidence |
+|---|---|---|---|
+| Lemma 5.2: sensitivity reduces to an equal-marginal coupling | paper, §5 | checked by hand | — |
+| E(U−V)² ≤ 4a·E\|U−c\| for every c (paper's Lemma 2.1 has 8aσ) | ours | proved in Lean | `coupling/Main.lean` |
+| The constant 4 cannot be lowered | ours | checked by computation | `coupling/verify.py` |
+| I(sign p) ≤ 4d√n | ours | checked by hand | — |
 ```
 
 ## Where each claim comes from (§2)

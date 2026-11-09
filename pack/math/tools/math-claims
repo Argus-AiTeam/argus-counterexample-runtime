@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""math-claims: read the claims tables in reports and sum them up.
+
+    math-claims <report.md | folder> ...           counts by basis and by source
+    math-claims --list <report.md | folder> ...    every claim, one per line
+    math-claims --check <report.md | folder> ...   also compile the Lean behind "proved in Lean"
+                                                    and look for the files behind "checked by computation"
+
+A claims table is a Markdown table with the columns Claim | Source | Basis | Evidence
+(or 命题 | 出处 | 依据 | 证据). Folders are searched for *.md files.
+"""
+import collections
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+HEADERS = (("claim", "source", "basis", "evidence"), ("命题", "出处", "依据", "证据"))
+BASIS = (("lean", ("lean",)), ("computation", ("comput", "计算")), ("hand", ("hand", "人工")),
+         ("conditional", ("conditional", "依赖")), ("open", ("open", "未证")), ("refuted", ("refut", "推翻")))
+SOURCE = (("paper", ("paper", "原文")), ("ours", ("ours", "我们")), ("earlier draft", ("earlier", "draft", "旧稿")),
+          ("literature", ("literature", "文献", "arxiv", "doi")))
+
+
+def cells(line):
+    parts = re.split(r"(?<!\\)\|", line.strip().strip("|"))
+    return [p.strip().replace("\\|", "|") for p in parts]
+
+
+def tables(path):
+    lines = path.read_text(errors="replace").splitlines()
+    rows = []
+    for i, line in enumerate(lines):
+        head = [c.lower() for c in cells(line)] if line.lstrip().startswith("|") else []
+        if tuple(head[:4]) in HEADERS and i + 1 < len(lines) and re.match(r"^\s*\|?[\s:|-]+\|?\s*$", lines[i + 1]):
+            for row in lines[i + 2:]:
+                if not row.lstrip().startswith("|"):
+                    break
+                c = cells(row) + ["", "", "", ""]
+                rows.append({"claim": c[0], "source": c[1], "basis": c[2], "evidence": c[3], "file": path})
+    return rows
+
+
+def kind(text, table):
+    low = text.lower()
+    for name, keys in table:
+        if any(k in low for k in keys):
+            return name
+    return "other"
+
+
+def evidence_paths(row):
+    found = re.findall(r"`([^`]+)`", row["evidence"]) or [w for w in re.split(r"[\s,;]+", row["evidence"]) if "/" in w or "." in w]
+    paths = []
+    for name in found:
+        for base in [row["file"].parent, *row["file"].parents]:
+            if (base / name).exists():
+                paths.append(base / name)
+                break
+        else:
+            paths.append(None if not name.strip() else Path(name))
+    return paths
+
+
+def check(rows):
+    problems = 0
+    for row in rows:
+        b = kind(row["basis"], BASIS)
+        if b not in ("lean", "computation"):
+            continue
+        paths = evidence_paths(row)
+        if not paths:
+            print(f"- {row['file']}: \"{row['claim'][:70]}\" is {row['basis']} but names no file.")
+            problems += 1
+        for p in paths:
+            if p is None or not p.exists():
+                print(f"- {row['file']}: \"{row['claim'][:70]}\": {p or 'evidence'} not found.")
+                problems += 1
+            elif b == "lean" and p.suffix == ".lean":
+                done = subprocess.run(["math-lean-verify", str(p)], capture_output=True, text=True)
+                if done.returncode != 0:
+                    print(f"- {row['file']}: \"{row['claim'][:70]}\": {p} does not pass math-lean-verify.")
+                    print("  " + "\n  ".join(done.stdout.strip().splitlines()[1:4]))
+                    problems += 1
+    print("Every Lean and computation file checked is in order." if not problems else f"{problems} thing(s) to look at.")
+    return 1 if problems else 0
+
+
+def main(argv):
+    flags = {a for a in argv if a.startswith("--")}
+    targets = [Path(a) for a in argv if not a.startswith("--")]
+    if not targets or "--help" in flags or "-h" in argv:
+        print(__doc__.strip())
+        return 0 if targets else 2
+    files = []
+    for t in targets:
+        files += sorted(t.rglob("*.md")) if t.is_dir() else [t]
+    rows = [r for f in files for r in tables(f)]
+    if not rows:
+        print("No claims table found.")
+        return 1
+    if "--list" in flags:
+        for r in rows:
+            print(f"[{kind(r['basis'], BASIS)} · {kind(r['source'], SOURCE)}] {r['claim']}  ({r['file']})")
+    by_basis = collections.Counter(kind(r["basis"], BASIS) for r in rows)
+    by_source = collections.Counter(kind(r["source"], SOURCE) for r in rows)
+    reports = len({r["file"] for r in rows})
+    print(f"{len(rows)} claims in {reports} report(s).")
+    print("  by basis:  " + ", ".join(f"{k} {v}" for k, v in by_basis.most_common()))
+    print("  by source: " + ", ".join(f"{k} {v}" for k, v in by_source.most_common()))
+    return check(rows) if "--check" in flags else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
