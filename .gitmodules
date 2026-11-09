@@ -1,0 +1,4 @@
+[submodule "core"]
+	path = core
+	url = https://github.com/lbx154/Argus.git
+	branch = feat/ts-core

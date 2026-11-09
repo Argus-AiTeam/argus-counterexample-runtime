@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Installs Argus Math on this machine: builds the Argus core from core/ (a git submodule pinned to
+# lbx154/Argus feat/ts-core), installs the `argus` command, and puts the math pack in Argus's state
+# root. The pack's own setup (Lean 4.31.0, Mathlib, Jacobian) runs when Argus starts.
+#
+#   ops/install                     # state root ~/.argus
+#   ARGUS_HOME=/path ops/install    # another state root
+#
+# Needs Node.js 22.12+, git and Python 3.12/3.13; see core/docs/getting-started.md for the backends.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+STATE="${ARGUS_HOME:-$HOME/.argus}"
+
+echo "== Argus core (core/)"
+git -C "$ROOT" submodule update --init core
+cd "$ROOT/core"
+echo "   at $(git log --oneline -1)"
+npm ci --no-audit --no-fund
+npm --prefix frontend/web ci --no-audit --no-fund
+rm -f lbx154-argus-*.tgz
+npm pack -w packages/core
+npm install -g ./lbx154-argus-*.tgz
+rm -f lbx154-argus-*.tgz
+echo "   installed: $(command -v argus) $(argus --version)"
+
+echo "== math pack -> $STATE/skill-packs/math"
+mkdir -p "$STATE/skill-packs"
+rm -rf "$STATE/skill-packs/math"
+cp -a "$ROOT/pack/math" "$STATE/skill-packs/math"
+echo "   version $(sed -n 's/^version: //p' "$STATE/skill-packs/math/SKILL.md")"
+
+cat <<EOF
+
+Done. Start Argus, for example:
+  argus --backend copilot --model gpt-6.1-sol
+or install ops/argus-ts.service as a user service. The math pack's setup runs on the first start
+(about 5 GB for Mathlib; set MATH_PACK_MATHLIB_FROM=<an existing Mathlib v4.31.0 workspace> to copy it instead).
+EOF

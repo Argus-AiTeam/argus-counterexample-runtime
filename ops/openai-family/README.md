@@ -1,8 +1,6 @@
 # Reviewing an OpenAI family with Argus on ts-core
 
-1. Install the `math` pack (`pack/math/`) into Argus: copy the folder to `<argus home>/skill-packs/math`.
-   Argus runs its setup once (Lean 4.31.0 and Mathlib). To reuse an existing Mathlib build instead of
-   downloading about 5 GB, start Argus with `MATH_PACK_MATHLIB_FROM=<workspace>` set.
+1. Install Argus and the math pack with `ops/install` (see the top-level README), and start Argus.
 2. Make a workspace for the family:
 
        ops/openai-family/make-workspace 127 ~/workspaces --lang zh    # or --lang en
