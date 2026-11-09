@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+"""math-lean-verify: compile Lean files against the pack's Mathlib and say plainly what came out.
+
+For each file: does it compile, does any declaration use `sorry`, does the file declare axioms of
+its own. Exit status 0 when every file passes, 1 otherwise. Nothing is recorded; the output is for
+the reader.
+
+    math-lean-verify path/to/Main.lean [more.lean ...] [--timeout SECONDS]
+
+The Mathlib workspace is $MATH_LEAN_WORKSPACE (set by the pack's setup).
+"""
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+AUDIT = HERE / "lean_axiom_audit.lean"
+DECL = re.compile(r"^\s*(?:@\[[^\]]*\]\s*)*(?:private\s+|protected\s+|noncomputable\s+)*(theorem|lemma)\s+([^\s:(\[{]+)", re.M)
+
+
+def lake() -> str:
+    for candidate in (os.environ.get("ELAN_HOME", "") + "/bin/lake", str(Path.home() / ".elan/bin/lake")):
+        if candidate.startswith("/") and os.access(candidate, os.X_OK):
+            return candidate
+    return "lake"
+
+
+def run(args, cwd, timeout):
+    try:
+        done = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        return done.returncode, done.stdout + done.stderr
+    except subprocess.TimeoutExpired:
+        return None, ""
+
+
+def verify(path: Path, workspace: Path, timeout: int) -> bool:
+    name = str(path)
+    if not path.is_file():
+        print(f"{name}: no such file.")
+        return False
+    source = path.read_text(errors="replace")
+    code, out = run([lake(), "env", "lean", str(path)], workspace, timeout)
+    if code is None:
+        print(f"{name}: did not finish compiling within {timeout} s.")
+        return False
+    errors = [l for l in out.splitlines() if ": error" in l]
+    sorry_count = len(re.findall(r"declaration uses [`'\"]sorry[`'\"]", out))
+    local_import = [m for m in re.findall(r"unknown module prefix '([^']+)'", out) if m != "Mathlib"]
+    if code != 0 or errors:
+        print(f"{name}: does not compile.")
+        if local_import:
+            print(f"  It imports local modules ({', '.join(sorted(set(local_import)))}); build it as a Lake package instead.")
+        for line in errors[:8]:
+            print("  " + line.replace(str(path) + ":", "line "))
+        if len(errors) > 8:
+            print(f"  … {len(errors) - 8} more errors")
+        return False
+    acode, aout = run([lake(), "env", "lean", "--run", str(AUDIT), str(path)], workspace, timeout)
+    axioms = re.findall(r"AXIOM_FOUND: (\S+)", aout)
+    decls = [m[1] for m in DECL.findall(source)]
+    problems = []
+    if sorry_count:
+        problems.append(f"{sorry_count} declaration(s) use sorry")
+    if axioms:
+        problems.append("declares its own axioms: " + ", ".join(axioms))
+    if acode not in (0, 3):
+        problems.append("the axiom check could not run")
+    sample = ", ".join(decls[:5]) + (f", … ({len(decls)} in all)" if len(decls) > 5 else "")
+    if problems:
+        print(f"{name}: compiles, but " + "; ".join(problems) + ".")
+        if decls:
+            print(f"  Declarations: {sample}")
+        return False
+    print(f"{name}: compiles with no sorry and no axioms of its own.")
+    if decls:
+        print(f"  Theorems and lemmas: {sample}")
+    return True
+
+
+def main(argv):
+    timeout = 1800
+    files = []
+    args = iter(argv)
+    for arg in args:
+        if arg == "--timeout":
+            timeout = int(next(args))
+        elif arg in ("-h", "--help"):
+            print(__doc__.strip())
+            return 0
+        else:
+            files.append(Path(arg).resolve())
+    if not files:
+        print(__doc__.strip())
+        return 2
+    workspace = Path(os.environ.get("MATH_LEAN_WORKSPACE", "")).expanduser()
+    if not (workspace / "lakefile.toml").is_file() and not (workspace / "lakefile.lean").is_file():
+        print("No Mathlib workspace: MATH_LEAN_WORKSPACE is unset or has no lakefile. Run the pack's setup.")
+        return 2
+    _, version = run([lake(), "env", "lean", "--version"], workspace, 120)
+    print(f"Lean: {version.strip() or 'unknown'} · workspace {workspace}")
+    ok = True
+    for path in files:
+        ok = verify(path, workspace, timeout) and ok
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
