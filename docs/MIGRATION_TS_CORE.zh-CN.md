@@ -1,6 +1,8 @@
 # Argus Math 迁移到 ts-core
 
-2026-11-09 · 依据 [MATH_SPEC.zh-CN.md](MATH_SPEC.zh-CN.md) 0.7 版
+> **进度（2026-11-09）**：第一步完成。数学 pack 在本仓库 `pack/math/`（含 Lean、引用、Jacobian 工具），运维脚本在 `ops/`；旧 Python runtime 已退役，保存在 `backup/python-runtime` 分支。服务器上已装好 ts-core 和数学 pack，下一步是试跑。
+
+2026-11-09 · 依据 [MATH_SPEC.zh-CN.md](MATH_SPEC.zh-CN.md) 0.15 版
 
 ## 为什么要迁
 

@@ -1,58 +1,24 @@
-# Argus Counterexample Runtime (Frozen Argus + `math` Vertical Unified Repository)
+# Argus Math
 
-This repository packages the exact **frozen Argus runtime (`argus-skill 0.1.2`)** together with the **`math` vertical**, **claim-ledger / proof-graph checkers**, **Jacobian MCP adapter**, **injected special prompts**, and **fleet supervision harness** used in the **Argus Live Counterexample Lab** campaigns (August–September 2026) in a single unified repository.
+Argus Math turns a mathematical question into a conclusion another person can understand and
+check: a paper verified and explained, a statement proved or refuted, a result pushed further.
+It runs on the Argus core ([`lbx154/Argus`](https://github.com/lbx154/Argus), branch
+`feat/ts-core`) through the math pack in this repository.
 
-- **Top-level spec (authoritative):** [`docs/MATH_SPEC.zh-CN.md`](docs/MATH_SPEC.zh-CN.md). Prompts, campaign contracts and tools derive from it; where they disagree, the spec wins.
-- [中文说明 (Chinese README)](README.zh-CN.md)
-- Public mathematical results archive (72 result packages + standalone AMS LaTeX papers): <https://github.com/Argus-AiTeam/argus-mathematics>
+| Path | What it is |
+|---|---|
+| [`docs/MATH_SPEC.zh-CN.md`](docs/MATH_SPEC.zh-CN.md) | The spec: the single authority for Argus Math |
+| [`docs/MIGRATION_TS_CORE.zh-CN.md`](docs/MIGRATION_TS_CORE.zh-CN.md) | Why and how Argus Math moved to the TypeScript core |
+| [`pack/math/`](pack/math/) | The math pack: `SKILL.md` (how the team works and writes), setup (Lean 4.31.0, Mathlib, Jacobian), tools `math-lean-verify`, `math-cite`, `math-ops`, tests |
+| [`ops/`](ops/) | Running it: a user service for Argus, and a script that prepares a workspace for one family of OpenAI's mathematics collection |
 
----
+## Use
 
-## 1. Key Components in This Repository
+1. Install Argus (see its getting-started guide) and copy `pack/math/` to `~/.argus/skill-packs/math`.
+   Argus runs the pack's setup once.
+2. Start Argus, for example with [`ops/argus-ts.service`](ops/argus-ts.service).
+3. For an OpenAI family: `ops/openai-family/make-workspace 127 ~/workspaces --lang zh`, open a
+   project on the workspace it prints, and paste its `REQUEST.md`.
 
-| Component | Path | Purpose |
-|---|---|---|
-| **`math` Vertical (Core)** | [`argus_skill/verticals/math/`](argus_skill/verticals/math/) (root mirror: [`math_vertical/`](math_vertical/)) | Complete `math` vertical executed by the counterexample campaigns |
-| ↳ Stage Machine & Gates | [`argus_skill/verticals/math/stages.py`](argus_skill/verticals/math/stages.py) | `scope` → `solve` → `review` checklists and deterministic `stage_completion_issues` gates |
-| ↳ Mathematical Claim Ledger | [`argus_skill/verticals/math/math_state.py`](argus_skill/verticals/math/math_state.py) | CLI & validator for `research/MATH_STATE.json` (claims, assumptions, routes, judgements) |
-| ↳ Proof Dependency Graph | [`argus_skill/verticals/math/proof_graph.py`](argus_skill/verticals/math/proof_graph.py) · [`proof_graph_check.py`](argus_skill/verticals/math/proof_graph_check.py) | Validator & gap analyzer for `research/PROOF_GRAPH.json` |
-| ↳ Primary-Source Citation Gate | [`argus_skill/verticals/math/citation_check.py`](argus_skill/verticals/math/citation_check.py) | Enforces primary-source lookup and proposition attribution before `review` completion |
-| ↳ Lean 4 Evidence Gate | [`argus_skill/verticals/math/lean_evidence.py`](argus_skill/verticals/math/lean_evidence.py) · [`lean_async.py`](argus_skill/verticals/math/lean_async.py) | Hash-bound Lean 4 compilation receipt and zero-`sorryAx` verifier |
-| ↳ Role Skill Prompts | [`argus_skill/verticals/math/skills/`](argus_skill/verticals/math/skills/) | Markdown role skills for Manager, Planner, Engineer, Reviewer, and Scientist |
-| **Proof Ledger Kernel** | [`argus_skill/proof_ledger/`](argus_skill/proof_ledger/) | Underlying store and status derivation kernel for `math_state` |
-| **Jacobian MCP Adapter** | [`argus_skill/tools/jacobian.py`](argus_skill/tools/jacobian.py) | Typed adapter connecting Argus to Jacobian `0.14.0` exact symbolic/LP/SMT/matrix operations |
-| **Terminal State Gate** | [`argus_skill/life/terminal_state.py`](argus_skill/life/terminal_state.py) | Terminal settlement rules for `targeted` vs. `exploratory` math missions |
-| **Special Prompts** | [`counterexample_special_prompts/`](counterexample_special_prompts/) | 4 operator prompt rules injected via `ARGUS_SKILL_SPECIAL_PROMPTS_DIR` |
-| **Fleet Launch & Supervision** | [`counterexample_harness/`](counterexample_harness/) | `launch_campaign_argus.py`, `supervise_argus_fleet.py`, and catalog validators |
-
----
-
-## 2. Frozen Branches in This Repository
-
-1. **`main` (Default — Complete Live Runtime + Vertical + Harness)**
-   - Exact snapshot of `/home/argustest/zimo/argus-live-update` as of 2026-11-07 (`feature/counterexample-lab-jacobian-update` @ `cad2bb44` + the live working-tree patch [`docs/live-runtime/working-tree-20261107.patch`](docs/live-runtime/working-tree-20261107.patch); campaign-evolved skills are kept in `counterexample_harness/shared_skills/`, not in `argus_skill/`) together with `math_vertical/`, `counterexample_special_prompts/`, and `counterexample_harness/`.
-2. **`feature/counterexample-lab-jacobian-update`**
-   - Snapshot line of the September 2026 live runtime (`60a7a2b6`), with later syncs through 2026-11-04. The current live HEAD is `cad2bb44`; its exact state is `main` plus the patch above.
-3. **`baseline-33da786`**
-   - Exact frozen baseline snapshot (`33da786bbc6787a2eeb63a5f492498eae87c78c7`) from `/home/argustest/zimo/argus-latest`.
-   - Full diff from `baseline-33da786` to `main`: <https://github.com/Argus-AiTeam/argus-counterexample-runtime/compare/baseline-33da786...main>
-
----
-
-## 3. Installation & Usage
-
-```bash
-git clone https://github.com/Argus-AiTeam/argus-counterexample-runtime.git
-cd argus-counterexample-runtime
-python3 -m venv .venv
-.venv/bin/pip install -e .
-```
-
-### Run the `math` Vertical Verifiers
-
-```bash
-.venv/bin/python -m argus_skill.verticals.math.math_state check --project-root <CAMPAIGN_DIR>
-.venv/bin/python -m argus_skill.verticals.math.proof_graph_check check --project-root <CAMPAIGN_DIR>
-.venv/bin/python -m argus_skill.verticals.math.proof_graph_check gap --project-root <CAMPAIGN_DIR>
-.venv/bin/python -m argus_skill.verticals.math.citation_check status --project-root <CAMPAIGN_DIR>
-```
+Results are published in [`Argus-AiTeam/argus-mathematics`](https://github.com/Argus-AiTeam/argus-mathematics).
+The retired Python runtime is kept on the branch `backup/python-runtime`.

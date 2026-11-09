@@ -1,6 +1,6 @@
 # Argus Math 顶层规格
 
-版本 0.14（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
+版本 0.15（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
 
 ## 0. 本文的地位
 
@@ -87,7 +87,7 @@ Agent 对本文、数学工具和 Argus runtime 只有读权限。
 
 | 证据 | 唯一来源 |
 |---|---|
-| 机械 | `math lean verify` 编译通过，没有 `sorry`，没有自定义公理 |
+| 机械 | `math-lean-verify` 编译通过，没有 `sorry`，没有自定义公理 |
 | 计算 | 记录了命令和输入、任何人可复跑的计算 |
 | 文献 | 读者存档的原文摘录 + 判定 |
 | 判断 | 审阅者的意见 |
@@ -116,12 +116,13 @@ Agent 对本文、数学工具和 Argus runtime 只有读权限。
 宿主不当家长：Agent 自己能做的事（等待、轮询、判断自己是否卡住、决定下一步），宿主不代办，也不设规则预防。
 宿主不判断数学，也不拦截交付。我们相信 Agent 如实报告；结论是否成立，由 Reviewer 读论证、重跑关键检查后判断。
 
-**工具** 只陈述机械事实。沿用现有 Python 实现（`argus_skill.verticals.math.*`），下文以 `math …` 简称：
+**工具** 只陈述机械事实，由数学 pack（本仓库 `pack/math/`）提供，用 Python 写成，由 pack 的 setup 装进每个角色的命令路径：
 
-| 简称 | 现有命令 | 做什么 |
-|---|---|---|
-| `math lean verify` | `python -m argus_skill.verticals.math.lean_evidence verify`（异步版 `lean_async`） | 编译并做公理审计，是机械证据的唯一来源 |
-| `math cite` | `python -m argus_skill.verticals.math.citation_check` | 查文献是否存在；存档摘录并记录判定 |
+| 工具 | 做什么 |
+|---|---|
+| `math-lean-verify` | 编译 Lean，说明有没有 `sorry`、每个定理依赖哪些标准公理以外的公理；是机械证据的唯一来源 |
+| `math-cite` | 取回被引文献（arXiv、DOI），打印版本，为出版社不给全文的找 arXiv 预印本；供阅读和摘录 |
+| `math-ops` | Jacobian 带类型的精确运算：按需求搜索、查看定义、执行；结果可复跑，是计算证据 |
 
 **角色** 的判断：Reviewer 读论证、亲自重跑关键的 Lean 和计算、核对报告里每一步的依据与证据是否相符、检查报告能否读懂，决定是否放行；
 Engineer 做数学并写报告；Planner 拆分路线；Manager 对运维负责。
@@ -169,33 +170,24 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每次编�
 - 每条不变量至少对应一个自动测试；pack 和提示里出现与本文冲突的概念（例如阶段机），测试失败。
 - 在 Agent 沙箱里，本文、数学工具和 runtime 只读。
 
-## 已知偏差（现行 runtime 与本文不一致之处）
+## 已知偏差
 
-现行 Python runtime 将迁移到 ts-core（`lbx154/Argus` 的 `feat/ts-core`），方案见
-[`MIGRATION_TS_CORE.zh-CN.md`](MIGRATION_TS_CORE.zh-CN.md)。迁移完成前，下列偏差仍然存在：
-
-- 现行 runtime 自建账本（`MATH_STATE.json`、`PROOF_GRAPH.json`、证书和收据）并用哈希绑定版本，与本文 §2、§4、I2 不一致；
-  迁移后不再使用：证明的结构写在报告里，其余记录沿用 ts-core。
-- 现行报告不写结论的出处，曾导致 Argus 推翻自己的捷径被汇总成"原文有错"（§2 现已要求逐条写明出处）。
-
-- 现行 Python runtime 有 `math check` 交付门禁，以及另一层研究目标完成检查（结果类别、新颖性、最终认证收据），
-  由 `argus_skill/core/research_contract.py` 和 Manager 完成判定执行。它们与本文 §4"宿主不拦截交付"不一致；迁移时删除。
-- 审查模式（§5）在现行 runtime 中借用 `exploratory` 目标级别运行，靠 campaign 契约说明新颖性填
-  `not_applicable`；尚未成为独立模式。
-
-- 9200 轮最初的契约（`counterexample_harness/old_draft_review_objective.md`）只要求审查 Argus 自己的旧稿，
-  偏离了 §1 初心。2026-11-07 起，未完成的 322 个家族已切换到 `counterexample_harness/openai_family_objective.md`；
-  切换前已完成的 51 个家族只做了旧稿审查，没有逐篇读懂报告和核验结论；已定不补做。
+目前没有。旧的 Python runtime（账本、证明图、阶段机、门禁、哈希证书）已退役，代码保存在本仓库的
+`backup/python-runtime` 分支，仅供查阅。Argus Math 运行在 ts-core 上，迁移方案见
+[`MIGRATION_TS_CORE.zh-CN.md`](MIGRATION_TS_CORE.zh-CN.md)。
 
 ## 10. 待定（需要你拍板）
 
 1. ~~`math check` 是否拦截~~ 0.8 起取消 `math check`，见第 5 项。
 2. 攻关模式下没有 Lean 证明的"证明"，能否作为最终结论交付，还是只能标为"限定结果"？
-3. ~~工具语言~~ 已定：先沿用现有 Python 工具（§4）。
+3. ~~工具语言~~ 已定：工具用 Python 写，作为数学 pack 的一部分（§4）。
 4. ~~进程模型~~ 已定：每个 campaign 一个进程（§6）。
 5. ~~交付门禁放在哪里~~ 已定：不设门禁，相信 Agent 如实报告；Reviewer 放行前亲自重跑关键检查（§4）。
 
 ## 变更记录
+
+- 0.15（2026-11-09）旧 Python runtime 退役，代码移到 `backup/python-runtime` 分支；本仓库只保留本文、迁移方案、数学 pack 和运维脚本。
+  §4 工具表改为 pack 的三个工具（`math-lean-verify`、`math-cite`、`math-ops`）；"已知偏差"清空。
 
 - 0.14（2026-11-09）定：取消 `PROOF.md`，避免同一份事实存两处；报告是唯一的记录，证明结构和每一步的依据只写在报告里；
   放弃的路线写进团队 wiki；并行分工交给 Planner 和信件（§2、§4、§7）。
