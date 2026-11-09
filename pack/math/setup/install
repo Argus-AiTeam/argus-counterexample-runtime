@@ -15,7 +15,7 @@ export PATH="$ELAN_HOME/bin:$PATH"
 
 echo "== tools"
 mkdir -p "$HOME_DIR/bin"
-cp "$PACK_DIR/tools/math-lean-verify" "$PACK_DIR/tools/math-cite" "$PACK_DIR/tools/lean_axiom_audit.lean" "$HOME_DIR/bin/"
+cp "$PACK_DIR/tools/math-lean-verify" "$PACK_DIR/tools/math-cite" "$HOME_DIR/bin/"
 chmod +x "$HOME_DIR/bin/math-lean-verify" "$HOME_DIR/bin/math-cite"
 
 echo "== elan and Lean $LEAN_VERSION"

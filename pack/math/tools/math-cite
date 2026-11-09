@@ -93,7 +93,24 @@ def doi(ident, into):
             print(f"  the DOI does not resolve (HTTP {error.code}).")
     except Exception as error:
         print(f"  the DOI could not be followed ({error}).")
+    preprints(title)
     return 0
+
+
+def preprints(title):
+    """Openly available arXiv versions of a published work, found by its title."""
+    words = re.findall(r"[A-Za-z]{4,}", title)[:10]
+    if not words:
+        return
+    query = "+AND+".join("ti:" + urllib.parse.quote(w) for w in words)
+    try:
+        data, _, _ = get(f"https://export.arxiv.org/api/query?search_query={query}&max_results=3")
+    except Exception:
+        return
+    for entry in ET.fromstring(data).findall(ATOM + "entry"):
+        found = " ".join((entry.findtext(ATOM + "title") or "").split())
+        if found and found.lower().strip(". ") == title.lower().strip(". "):
+            print(f"  arXiv preprint: {entry.findtext(ATOM + 'id').rsplit('/', 1)[-1]} (same title; check it matches the published version you cite)")
 
 
 def main(argv):

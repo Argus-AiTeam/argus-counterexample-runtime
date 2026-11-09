@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 """math-lean-verify: compile Lean files against the pack's Mathlib and say plainly what came out.
 
-For each file: does it compile, does any declaration use `sorry`, does the file declare axioms of
-its own. Exit status 0 when every file passes, 1 otherwise. Nothing is recorded; the output is for
-the reader.
+For each file: does it compile; does any declaration use `sorry`; which axioms each theorem rests
+on beyond Lean's standard three (propext, Classical.choice, Quot.sound), including the ones
+`native_decide` adds; does it switch off kernel checking. One compile per file.
 
     math-lean-verify path/to/Main.lean [more.lean ...] [--timeout SECONDS]
 
-The Mathlib workspace is $MATH_LEAN_WORKSPACE (set by the pack's setup).
+Exit status: 0 every file passes; 1 some file fails mathematically (does not compile, sorry,
+extra axioms); 2 some file could not be verified here (no Mathlib, missing module, timeout).
+Nothing is recorded; the output is for the reader. The Mathlib workspace is $MATH_LEAN_WORKSPACE.
 """
 import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
-AUDIT = HERE / "lean_axiom_audit.lean"
+STANDARD = {"propext", "Classical.choice", "Quot.sound"}
 DECL = re.compile(r"^\s*(?:@\[[^\]]*\]\s*)*(?:private\s+|protected\s+|noncomputable\s+)*(theorem|lemma)\s+([^\s:(\[{]+)", re.M)
+NAMESPACE = re.compile(r"^\s*namespace\s+(\S+)", re.M)
+LOCAL_AXIOM = re.compile(r"^\s*(?:private\s+)?axiom\s+([^\s:(\[{]+)", re.M)
+ENVIRONMENT = re.compile(r"unknown module prefix|unknown package|object file .* does not exist|could not resolve 'HEAD'|No directory '", re.I)
 
 
 def lake() -> str:
@@ -35,48 +40,78 @@ def run(args, cwd, timeout):
         return None, ""
 
 
-def verify(path: Path, workspace: Path, timeout: int) -> bool:
+def explain(axiom: str) -> str:
+    if "native_decide" in axiom or axiom in ("Lean.ofReduceBool", "Lean.trustCompiler"):
+        return f"{axiom} (from native_decide: trusts compiled code; use decide, or say so in words)"
+    if axiom == "sorryAx":
+        return "sorryAx (a sorry somewhere underneath)"
+    return axiom
+
+
+def verify(path: Path, workspace: Path, timeout: int) -> int:
+    """0 passes, 1 fails mathematically, 2 could not be verified here."""
     name = str(path)
     if not path.is_file():
         print(f"{name}: no such file.")
-        return False
+        return 2
     source = path.read_text(errors="replace")
-    code, out = run([lake(), "env", "lean", str(path)], workspace, timeout)
+    if re.search(r"set_option\s+debug\.skipKernelTC", source):
+        print(f"{name}: switches off kernel type checking (debug.skipKernelTC); not accepted as a proof.")
+        return 1
+    decls = [m[1] for m in DECL.findall(source)]
+    namespaces = " ".join(dict.fromkeys(NAMESPACE.findall(source)))
+    opener = f"open {namespaces} in " if namespaces else ""
+    original_lines = source.count("\n") + 1
+    probe = source + "\n\n" + "".join(f"{opener}#print axioms {d}\n" for d in decls)
+    with tempfile.TemporaryDirectory() as tmp:
+        copy = Path(tmp) / path.name
+        copy.write_text(probe)
+        code, out = run([lake(), "env", "lean", str(copy)], workspace, timeout)
     if code is None:
-        print(f"{name}: did not finish compiling within {timeout} s.")
-        return False
-    errors = [l for l in out.splitlines() if ": error" in l]
-    sorry_count = len(re.findall(r"declaration uses [`'\"]sorry[`'\"]", out))
-    local_import = [m for m in re.findall(r"unknown module prefix '([^']+)'", out) if m != "Mathlib"]
-    if code != 0 or errors:
+        print(f"{name}: not verified here: compiling did not finish within {timeout} s.")
+        return 2
+    out = out.replace(str(copy), name)
+    errors = []
+    for line in out.splitlines():
+        m = re.match(r"^.*?:(\d+):\d+: error", line)
+        if m and int(m.group(1)) <= original_lines:
+            errors.append(line)
+    if ENVIRONMENT.search(out) and errors:
+        print(f"{name}: not verified here: the environment lacks a module it imports.")
+        for line in errors[:3]:
+            print("  " + line.replace(name + ":", "line "))
+        return 2
+    if errors:
         print(f"{name}: does not compile.")
-        if local_import:
-            print(f"  It imports local modules ({', '.join(sorted(set(local_import)))}); build it as a Lake package instead.")
         for line in errors[:8]:
-            print("  " + line.replace(str(path) + ":", "line "))
+            print("  " + line.replace(name + ":", "line "))
         if len(errors) > 8:
             print(f"  … {len(errors) - 8} more errors")
-        return False
-    acode, aout = run([lake(), "env", "lean", "--run", str(AUDIT), str(path)], workspace, timeout)
-    axioms = re.findall(r"AXIOM_FOUND: (\S+)", aout)
-    decls = [m[1] for m in DECL.findall(source)]
+        return 1
+    sorry_count = len(re.findall(r"declaration uses [`'\"]sorry[`'\"]", out))
+    extra = {}
+    for who, axioms in re.findall(r"^'([^']+)' depends on axioms: \[([^\]]*)\]", out, re.M):
+        odd = [a.strip() for a in axioms.split(",") if a.strip() and a.strip() not in STANDARD]
+        if odd:
+            extra[who] = odd
+    local = LOCAL_AXIOM.findall(source)
     problems = []
     if sorry_count:
         problems.append(f"{sorry_count} declaration(s) use sorry")
-    if axioms:
-        problems.append("declares its own axioms: " + ", ".join(axioms))
-    if acode not in (0, 3):
-        problems.append("the axiom check could not run")
+    if local:
+        problems.append("declares axioms: " + ", ".join(local))
+    for who, odd in extra.items():
+        problems.append(f"{who} rests on " + ", ".join(explain(a) for a in odd))
     sample = ", ".join(decls[:5]) + (f", … ({len(decls)} in all)" if len(decls) > 5 else "")
     if problems:
-        print(f"{name}: compiles, but " + "; ".join(problems) + ".")
-        if decls:
-            print(f"  Declarations: {sample}")
-        return False
-    print(f"{name}: compiles with no sorry and no axioms of its own.")
+        print(f"{name}: compiles, but:")
+        for p in problems:
+            print("  - " + p)
+        return 1
+    print(f"{name}: compiles; no sorry; its theorems rest only on Lean's standard axioms.")
     if decls:
         print(f"  Theorems and lemmas: {sample}")
-    return True
+    return 0
 
 
 def main(argv):
@@ -96,14 +131,15 @@ def main(argv):
         return 2
     workspace = Path(os.environ.get("MATH_LEAN_WORKSPACE", "")).expanduser()
     if not (workspace / "lakefile.toml").is_file() and not (workspace / "lakefile.lean").is_file():
-        print("No Mathlib workspace: MATH_LEAN_WORKSPACE is unset or has no lakefile. Run the pack's setup.")
+        print("Not verified: MATH_LEAN_WORKSPACE is unset or has no lakefile. Run the pack's setup.")
         return 2
     _, version = run([lake(), "env", "lean", "--version"], workspace, 120)
     print(f"Lean: {version.strip() or 'unknown'} · workspace {workspace}")
-    ok = True
+    worst = 0
     for path in files:
-        ok = verify(path, workspace, timeout) and ok
-    return 0 if ok else 1
+        result = verify(path, workspace, timeout)
+        worst = 1 if 1 in (worst, result) else max(worst, result)
+    return worst
 
 
 if __name__ == "__main__":
