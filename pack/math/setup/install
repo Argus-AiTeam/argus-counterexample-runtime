@@ -9,7 +9,7 @@ set -euo pipefail
 LEAN_VERSION="v4.31.0"
 MATHLIB_REV="fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
 HOME_DIR="${ARGUS_PACK_HOME:?ARGUS_PACK_HOME is not set}"
-PACK_DIR="${ARGUS_PACK_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
+PACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"   # the pack root; ARGUS_PACK_DIR is the setup/ folder
 export ELAN_HOME="$HOME_DIR/elan"
 export PATH="$ELAN_HOME/bin:$PATH"
 

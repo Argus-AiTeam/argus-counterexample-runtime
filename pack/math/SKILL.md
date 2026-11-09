@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.2.1
+version: 0.2.2
 setup: setup/install
 ---
 
