@@ -1,6 +1,6 @@
 # Argus Math 顶层规格
 
-版本 0.6（§10 第 1、3、4 项已定，第 2 项待定） · 2026-11-07
+版本 0.7（§10 第 1、3、4 项已定，第 2、5 项待定） · 2026-11-09
 
 ## 0. 本文的地位
 
@@ -52,11 +52,19 @@ Agent 对本文、数学工具和 Argus runtime 只有读权限。
 - 指出问题时，给出最小的可手算例子或可复跑的计算，并指到具体哪一步；
 - 写明依赖的外部结果，以及哪些部分是机器核过的、哪些只是人工判断。
 
+**证明要写给人读。** 机器核过不等于讲清楚了。写证明时：
+
+- 先用几句话说核心想法：为什么这条路走得通，难点在哪里；再给出骨架，最后才展开细节；
+- 原文跳过的步骤，补上，并注明"原文此处从略"，让读者知道哪些是原文的、哪些是补的；
+- 一步依赖某个引理或外部定理时，当场说清它在这里起什么作用，不只给一个编号；
+- 机器核过的部分，用一两句话说清 Lean 实际证明了什么命题，读者不读 Lean 也能明白；
+- 改进原文时，把原来的结论和新的结论并排写出，说清改进落在证明的哪一步。
+
 每个结论标出支撑它的证据类型。四类证据互不相加，也没有综合分：
 
 | 证据 | 唯一来源 |
 |---|---|
-| 机械 | `math lean verify` 编译通过，并与源码、陈述忠实性文档的哈希绑定 |
+| 机械 | `math lean verify` 编译通过；交付时由 `math check` 现场重新编译，不沿用旧的编译结果 |
 | 计算 | 记录了命令和输入、任何人可复跑的计算 |
 | 文献 | 读者存档的原文摘录 + 判定 |
 | 判断 | 审阅者的意见 |
@@ -66,8 +74,8 @@ Agent 对本文、数学工具和 Argus runtime 只有读权限。
 每条都是硬规则，没有例外，也不允许按项目协商。
 
 - **I1 状态只能推导。** claim 的状态由账本里的证据推导，不能手写。"已证"只能来自机械证据。
-- **I2 陈述忠实性单独成文。** 形式陈述和原问题是否等价，写在单独的文档里，与编译结果哈希绑定；
-  任何一方改动，原结果失效。
+- **I2 陈述忠实性单独成文。** 形式陈述和原问题是否等价，写在与 Lean 文件放在一起的单独文档里。
+  "已证"以交付时 `math check` 现场编译通过为准，不沿用任何旧的编译结果；版本由 git 记录，不另设哈希。
 - **I3 引用指向命题。** 引用写明文献版本和具体定理号；交付前必须有非作者的人读过原文，并存档摘录；
   拿不到原文就明说"无法核对"。
 - **I4 不自我验收。** 写结论的人不能核验自己的结论和引用。
@@ -90,10 +98,10 @@ Agent 对本文、数学工具和 Argus runtime 只有读权限。
 | 简称 | 现有命令 | 做什么 |
 |---|---|---|
 | `math ledger` | `python -m argus_skill.verticals.math.math_state` | 记录上下文、claim、假设、路线、证据；推导状态 |
-| `math lean verify` | `python -m argus_skill.verticals.math.lean_evidence verify`（异步版 `lean_async`） | 编译并绑定哈希，是机械证据的唯一写入口 |
+| `math lean verify` | `python -m argus_skill.verticals.math.lean_evidence verify`（异步版 `lean_async`） | 编译并做公理审计，是机械证据的唯一来源 |
 | `math cite` | `python -m argus_skill.verticals.math.citation_check` | 查文献是否存在；存档摘录并记录判定 |
 | `math gap` | `python -m argus_skill.verticals.math.proof_graph_check gap` | 目标还依赖哪些未证命题 |
-| `math check` | `python -m argus_skill.verticals.math.check` | 运行交付门禁本身（与宿主拒绝交付用的是同一个函数），有问题时返回非零 |
+| `math check` | `python -m argus_skill.verticals.math.check` | 运行交付门禁本身：现场重新编译报告引用的 Lean 文件，检查结论与出处是否对得上；有问题时返回非零 |
 
 **角色** 的判断：Reviewer 读论证、读 `math check` 报告，决定是否放行；
 Engineer 做数学；Planner 拆分路线；Manager 对运维负责。
@@ -144,6 +152,13 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每张证�
 
 ## 已知偏差（现行 runtime 与本文不一致之处）
 
+现行 Python runtime 将迁移到 ts-core（`lbx154/Argus` 的 `feat/ts-core`），方案见
+[`MIGRATION_TS_CORE.zh-CN.md`](MIGRATION_TS_CORE.zh-CN.md)。迁移完成前，下列偏差仍然存在：
+
+- 现行账本和证书用哈希绑定版本（`artifact_sha256`、`content_hash` 等），与 0.7 版 I2 不一致；迁移时删除。
+- 现行账本没有记录结论的出处（原文 / Argus 提出 / 旧稿 / 外部文献），曾导致 Argus 推翻自己的捷径被汇总成"原文有错"。
+- 现行 runtime 没有按 campaign 或按单次调用的花销、时长、轮数上限（与 §7 不一致）。
+
 - 现行 Python runtime 在 `math check` 之外，还有一层研究目标完成检查（结果类别、新颖性、最终认证收据），
   由 `argus_skill/core/research_contract.py` 和 Manager 完成判定执行。它与本文 §4 "门禁只有一处"不一致，待收敛。
 - 审查模式（§5）在现行 runtime 中借用 `exploratory` 目标级别运行，靠 campaign 契约说明新颖性填
@@ -159,8 +174,12 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每张证�
 2. 攻关模式下没有 Lean 证明的"证明"，能否作为最终结论交付，还是只能标为"限定结果"？
 3. ~~工具语言~~ 已定：先沿用现有 Python 工具（§4）。
 4. ~~进程模型~~ 已定：每个 campaign 一个进程（§6）。
+5. `math check` 的交付门禁放在哪里：作为 Reviewer 放行前必须亲自重跑的检查，还是由数学 pack 提供交付前钩子、由宿主执行？
 
 ## 变更记录
+
+- 0.7（2026-11-09）定：去掉哈希绑定，"已证"以交付时现场编译为准、版本交给 git（I2、§2、§4）；§2 增加"证明要写给人读"；
+  记录迁移到 ts-core 的决定和现存偏差；§10 增加第 5 项（门禁落点）。
 
 - 0.6（2026-11-08）定：范围为 721 篇在架稿件（373 个家族），撤稿不纳入；按旧契约已完成的 51 个家族不补做。
 - 0.5（2026-11-07）新增 §7 节约 token；之后各节顺延一位。
