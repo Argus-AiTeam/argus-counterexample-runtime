@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.3.0
+version: 0.4.0
 setup: setup/install
 ---
 
@@ -127,6 +127,23 @@ The paper's bound holds, and its constant can be halved: I(sign p) ≤ 4d√n (p
 - A SAT answer counts once the assignment is expanded and checked against the original
   mathematical conditions, not only the encoding. A bare UNSAT is not a refutation without a
   checked proof certificate or a Lean proof.
+
+## Exact operations: Jacobian
+
+`math-ops` gives the Jacobian library: about six hundred typed, bounded operations (exact
+linear algebra over Z and Q, Smith and Hermite forms, lattices and abelian groups, polynomial
+and number-theoretic computations, LP and SAT/SMT checks with certificates, graph invariants,
+simplicial homology, and more).
+
+- `math-ops find smith normal form` lists the operations that match; `math-ops show <id>` gives
+  the exact input it takes and what it guarantees; `math-ops run <id> payload.json` runs it.
+- Reach for it when a step reduces to a finite, well-typed computation that a hand calculation
+  would make error-prone: a determinant over Z, an invariant factor, a feasibility certificate.
+  It does not decide what the step means; you still say why this computation settles it.
+- Keep the payload file next to the report and cite the command: anyone can rerun it, and it
+  counts as computational evidence. Prefer an operation whose result carries a certificate
+  ("certified" in its id) when the conclusion rests on it.
+- A result marked approximate, incomplete, unknown or timed out settles nothing.
 
 ## Writing for a reader (§2, §3 I8)
 

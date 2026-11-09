@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+"""math-ops: find and run Jacobian's typed mathematical operations (exact where they say so).
+
+    math-ops find <words…>              operations whose id, title, tags or description match
+    math-ops show <operation_id>        its full declaration: input and output schema, examples
+    math-ops run <operation_id> <payload.json | 'JSON'>
+
+`run` prints Jacobian's typed result. Save the payload in a file next to your report and cite
+the command, so anyone can rerun it: that is computational evidence. A result that says it is
+approximate, incomplete or unknown is not a proof of anything.
+
+Jacobian is $MATH_JACOBIAN (set by the pack's setup).
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+
+def jacobian():
+    return os.environ.get("MATH_JACOBIAN") or "jacobian"
+
+
+def call(args):
+    done = subprocess.run([jacobian(), *args], capture_output=True, text=True)
+    return done.returncode, done.stdout, done.stderr
+
+
+def find(words):
+    code, out, err = call(["catalog"])
+    if code != 0:
+        print(err.strip() or "jacobian catalog failed")
+        return 2
+    ops = json.loads(out)["operations"]
+    terms = [w.lower() for w in words]
+    scored = []
+    for op in ops:
+        oid = op["operation_id"].lower()
+        title = (op.get("title") or "").lower()
+        tags = " ".join(op.get("tags") or []).lower()
+        desc = (op.get("description") or "").lower()
+        score = 0
+        for t in terms:
+            if t in oid:
+                score += 3
+            if t in title:
+                score += 3
+            if t in tags:
+                score += 2
+            if t in desc:
+                score += 1
+        if score and all(t in oid + " " + title + " " + tags + " " + desc for t in terms):
+            scored.append((score, op["operation_id"], op.get("title") or ""))
+    if not scored:
+        print(f"No operation matches {' '.join(words)} among {len(ops)}. Try fewer or other words.")
+        return 1
+    for _, oid, title in sorted(scored, key=lambda s: (-s[0], s[1]))[:20]:
+        print(f"{oid} — {title}")
+    if len(scored) > 20:
+        print(f"… {len(scored) - 20} more; add words to narrow.")
+    return 0
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0 if argv else 2
+    cmd, rest = argv[0], argv[1:]
+    if cmd == "find" and rest:
+        return find(rest)
+    if cmd == "show" and len(rest) == 1:
+        code, out, err = call(["inspect", rest[0]])
+        print(out.strip() or err.strip())
+        return code
+    if cmd == "run" and len(rest) == 2:
+        payload = rest[1]
+        args = ["run", rest[0], "--file", payload] if Path(payload).is_file() else ["run", rest[0], "--json", payload]
+        code, out, err = call(args)
+        print(out.strip() or err.strip())
+        return code
+    print(__doc__.strip())
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
