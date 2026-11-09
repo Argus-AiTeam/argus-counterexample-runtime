@@ -1,10 +1,13 @@
 # Argus Math 顶层规格
 
-版本 0.9（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
+版本 0.10（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
 
 ## 0. 本文的地位
 
-本文是 Argus Math 的唯一权威。数学 pack 的 `SKILL.md`、角色提示、campaign 契约（OBJECTIVE/LAUNCH）、
+本文是 Argus Math 的唯一权威。正本在 math runtime 仓库
+（`Argus-AiTeam/argus-counterexample-runtime` 的 `docs/MATH_SPEC.zh-CN.md`）；其他仓库里的副本以正本为准。
+Argus Math 全面运行在 ts-core 上（`lbx154/Argus`）；math runtime 仓库保存本文和数学 pack。
+数学 pack 的 `SKILL.md`、角色提示、campaign 契约（OBJECTIVE/LAUNCH）、
 harness 和工具都从本文派生，并标注所依据的条款号。派生物与本文冲突时，以本文为准，派生物要改。
 
 本文只由运维（lbx154）修改。每次修改升版本号，并在文末变更记录里写明改了什么、为什么。
@@ -174,6 +177,8 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每次编�
 5. ~~交付门禁放在哪里~~ 已定：不设门禁，相信 Agent 如实报告；Reviewer 放行前亲自重跑关键检查（§4）。
 
 ## 变更记录
+
+- 0.10（2026-11-09）§0 写明：正本仍在 math runtime 仓库，其他副本以正本为准；Argus Math 全面运行在 ts-core 上。
 
 - 0.9（2026-11-09）定：宿主就是 ts-core，只传信、守权限边界，不当家长；不另设账本，记录沿用 ts-core（§4、§6）；
   去掉 `math ledger`；I1 改为"已证只能来自机械证据"；交付物改为结论信 + 报告 + 证据文件，报告逐条写明出处（§2）。
