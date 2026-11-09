@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Fetch a cited work (arXiv id or DOI) in the version cited, to read the proposition itself.
 """math-cite: fetch a cited work so you can read the proposition you cite.
 
     math-cite arXiv:2002.08717v2      # or 2002.08717, math/0206203v2

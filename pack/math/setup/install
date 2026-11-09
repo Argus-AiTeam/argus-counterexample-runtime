@@ -14,10 +14,18 @@ PACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"   # the pack root; ARGUS_PACK_DIR i
 export ELAN_HOME="$HOME_DIR/elan"
 export PATH="$ELAN_HOME/bin:$PATH"
 
-echo "== tools"
-mkdir -p "$HOME_DIR/bin"
-cp "$PACK_DIR/tools/math-lean-verify" "$PACK_DIR/tools/math-cite" "$PACK_DIR/tools/math-ops" "$PACK_DIR/tools/math-claims" "$HOME_DIR/bin/"
-chmod +x "$HOME_DIR/bin/math-lean-verify" "$HOME_DIR/bin/math-cite" "$HOME_DIR/bin/math-ops" "$HOME_DIR/bin/math-claims"
+echo "== tools -> the team's tool library"
+# The tools live in the team's tools/ (ts-core's shared library, on every role's PATH, history kept in
+# git), where the team may change, add or remove them. A tool already there is the team's version and
+# is left alone; only a missing one is put in.
+LIBRARY="${ARGUS_SHARED:-${ARGUS_HOME:-$(cd "$HOME_DIR/../../.." && pwd)}}/tools"
+mkdir -p "$LIBRARY"
+for tool in "$PACK_DIR"/tools/*; do
+  name="$(basename "$tool")"
+  if [ -e "$LIBRARY/$name" ]; then echo "   $name: the team's version kept"
+  else cp "$tool" "$LIBRARY/$name"; chmod +x "$LIBRARY/$name"; echo "   $name: added"; fi
+done
+rm -rf "$HOME_DIR/bin"; mkdir -p "$HOME_DIR/bin"
 
 echo "== elan and Lean $LEAN_VERSION"
 if [ ! -x "$ELAN_HOME/bin/elan" ]; then

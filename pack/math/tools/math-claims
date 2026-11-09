@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Read the claims tables in math reports, sum them up, optionally recompile the Lean behind them.
 """math-claims: read the claims tables in reports and sum them up.
 
     math-claims <report.md | folder> ...           counts by basis and by source

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Find, inspect and run Jacobian's typed exact mathematical operations.
 """math-ops: find and run Jacobian's typed mathematical operations (exact where they say so).
 
     math-ops find <words…>              operations whose id, title, tags or description match

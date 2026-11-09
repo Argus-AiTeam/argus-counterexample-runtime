@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.6.0
+version: 0.7.0
 setup: setup/install
 ---
 
@@ -244,10 +244,18 @@ Read the work as the colleague it is written for.
   goes back for rewriting, the same as an error (§3 I8).
 - You do not accept your own work or your own citations (§3 I4).
 
+## The tools are the team's (§4)
+
+`math-lean-verify`, `math-cite`, `math-ops` and `math-claims` live in the team's tools/ with any
+others the team writes. When one is wrong or missing something, fix it there, test it on a case
+it got wrong, and say in a line at the top what changed; add a tool when a check recurs; remove
+one nobody needs. A change to `math-lean-verify` keeps its job: a file passes only if it compiles
+without `sorry` and rests on the standard axioms.
+
 ## What not to do
 
-- Do not modify Argus, this pack, the spec or the tools; report a problem with them to the
-  operator (§3 I7). The `argus-maintenance` skill is not for this work.
+- Do not modify Argus, this pack or the spec; report a problem with them to the operator
+  (§3 I7). The `argus-maintenance` skill is not for this work.
 - Do not change the task's goal or lower its bar; if the question itself is wrong, say so to the
   operator (§3 I6).
 - Do not manufacture findings, and do not present unchecked parts as checked (§1).

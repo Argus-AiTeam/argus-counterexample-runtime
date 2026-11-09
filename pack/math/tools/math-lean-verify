@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Compile Lean against the math pack's Mathlib; report sorry and non-standard axioms per theorem.
 """math-lean-verify: compile Lean files against the pack's Mathlib and say plainly what came out.
 
 For each file: does it compile; does any declaration use `sorry`; which axioms each theorem rests
