@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.2.2
+version: 0.3.0
 setup: setup/install
 ---
 
@@ -22,7 +22,7 @@ section numbers below refer to it. Where this file and the spec disagree, the sp
 
 ## Pin down the statement first
 
-- Write the exact statement at the top of `PROOF.md` before any other work: the objects and
+- Write the exact statement at the top of the report before any other work: the objects and
   their domains, the order of quantifiers, normalizations and conventions (which norm, whether 0
   is a natural number, up to which equivalence, which asymptotic regime). Most wrong
   conclusions start from a statement read slightly differently.
@@ -66,45 +66,40 @@ itself should be noticeably easier. Write it whether or not you find anything wr
 
 The verdict (holds, wrong, gap, improved, open) follows in its own section.
 
-## The proof map: PROOF.md (§2)
+## The report is the record (§2)
 
-Each project keeps one `PROOF.md` at its root. It is how the proof is organized, and it is written
-for people:
+The report is the one place where the proof stands: its structure, and what each step rests on.
+Nothing else keeps a second copy, so nothing can disagree with it. While the work goes on, the
+report is the draft being written; read it before you start, and change it when the proof
+changes. In review mode the report is the reader's guide followed by the verdict.
 
-- **Goal**: the pinned statement, quoted, with where it comes from.
-- **Skeleton**: the main steps in order, and which lemmas each step uses.
-- **Lemmas**: one line each, saying what it states, where it comes from (the paper, ours, an
-  earlier draft, the literature), its status and the file holding the evidence. The status is one
-  of: proved in Lean; checked by computation; checked by hand; conditional on a cited result
-  (name the work, version and theorem); open; refuted. "Proved in Lean" needs a Lean file that
-  passes `math-lean-verify` (§3 I1). When a definition changes, every lemma stated with it is
-  open again until someone rereads it.
-- **Routes given up**: what was tried, what killed it, and whether the idea is wrong or only
-  unfinished. Two routes that die of the same obstruction were one route.
+- **The statement** at the top, pinned down as above, quoted, with where it comes from.
+- **The skeleton**: the main steps in order, and which lemmas each uses.
+- **Each step says whose it is and what it rests on**: proved in Lean (with the file); checked by
+  computation (with the script); checked by hand; conditional on a cited result (the work,
+  version and theorem); open; or refuted. "Proved in Lean" needs a file that passes
+  `math-lean-verify` (§3 I1). When a definition changes, every step stated with it is checked
+  again.
+- Progress means a step's basis got stronger. Checking a finite case at a larger bound moves
+  nothing (§3 I5), and ruling out one sufficient criterion does not settle the question.
+- **Routes given up** go in the team wiki, not the report: what was tried, what killed it, and
+  whether the idea is wrong or only unfinished. Two routes that die of the same obstruction were
+  one route. Look there before trying a route.
+- Settle what is already known before several people split the work, so the search is paid for
+  once; the Planner splits the work into tasks and the letters carry it.
 
-Read it before starting; change it whenever the proof changes. Progress means a lemma changed
-status; checking a finite case at a larger bound moves nothing (§3 I5), and ruling out one
-sufficient criterion does not settle the question. Settle what is already known before several
-people split the work, so the search is paid for once; then each takes lemmas from the map.
-The report explains, step by step, what the map lists. For example:
+For example, the verdict section of a guide might read:
 
 ```markdown
-# Goal
-Theorem 1.1 of `paper.tex` (sec. 1): I(sign p) ≤ 8d√n for every degree-d PTF on n variables.
+## Verdict
+The paper's bound holds, and its constant can be halved: I(sign p) ≤ 4d√n (paper: 8d√n).
 
-# Skeleton
-1. Reduce sensitivity to a coupling of two equal-marginal binomials (paper, Lemma 5.2).
-2. Bound E(U−V)² for that coupling (paper, Lemma 2.1: ≤ 8aσ) — the step we improve.
-3. Combine: I ≤ 2·E(U−V)².
-
-# Lemmas
-- L2.1' (ours): E(U−V)² ≤ 4a·E|U−c| for every c — proved in Lean (`coupling/Main.lean`);
-  improves the paper's Lemma 2.1, giving I(sign p) ≤ 4d√n.
-- Constant 4 is optimal (ours) — checked by computation (`coupling/verify.py`).
-- Lemma 5.2 (paper) — checked by hand; used unchanged.
-
-# Routes given up
-- Bounding E(U−V)² through the variance alone: loses the factor 2 we need (idea is wrong).
+1. Reduction to a coupling of two equal-marginal binomials — the paper's Lemma 5.2, checked by
+   hand; used unchanged.
+2. The coupling bound — ours: E(U−V)² ≤ 4a·E|U−c| for every c, proved in Lean
+   (`coupling/Main.lean`), where the paper's Lemma 2.1 has 8aσ. The constant 4 cannot be
+   lowered: checked by computation (`coupling/verify.py`).
+3. Combining as in the paper's Section 5 gives the bound.
 ```
 
 ## Where each claim comes from (§2)
@@ -157,8 +152,7 @@ quarter of an hour and be able to check the key steps in an hour.
   theorem, to evidence by file path.
 - A caveat appears once, where it would change what the reader does. Repeated disclaimers,
   pre-emptive defences and scope boilerplate are written out.
-- Write each fact once. The report, the guide and `PROOF.md` are the record; no plans, audits or
-  status files beside them (§7).
+- Write each fact once. The report is the record; no plans, audits or status files beside it (§7).
 
 ## Is it new?
 
@@ -208,8 +202,8 @@ which layer failed: the argument, the decomposition, or the whole approach.
 
 Read the work as the colleague it is written for.
 
-- Rerun the Lean and the computations the conclusion rests on, and check that every status in
-  `PROOF.md` matches its evidence.
+- Rerun the Lean and the computations the conclusion rests on, and check that what the report
+  says each step rests on matches its evidence.
 - Check every "the paper is wrong" against the sentence it points to, and every improvement
   against the paper's actual statement: misquoting the baseline is the most common mistake.
 - Ask whether an improvement is already implied by the paper's own proof or only changes a

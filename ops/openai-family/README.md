@@ -7,10 +7,10 @@
 
        ops/openai-family/make-workspace 127 ~/workspaces --lang zh    # or --lang en
 
-   It copies the family's papers from openai/math @ 4eaee875, Argus's earlier drafts and the
-   item-by-item verification from argus-mathematics, and writes `REQUEST.md`.
+   It copies the family's papers from openai/math @ 4eaee875 and Argus's earlier drafts from
+   argus-mathematics (without earlier verdicts, so they are rechecked), and writes `REQUEST.md`.
 3. Open an Argus project on that workspace and paste `REQUEST.md` as the request.
 
-What comes back: `guide/<paper>.md` for each paper (a reader's guide, then the verdict), the
-family's proof map `PROOF.md`, any Lean or computations next to them, and a letter that opens with
-the verdict for each paper.
+What comes back: `guide/<paper>.md` for each paper (a reader's guide, then the verdict; the one
+record of the work), any Lean or computations next to it, and a letter that opens with the verdict
+for each paper. Routes given up are in the team wiki.

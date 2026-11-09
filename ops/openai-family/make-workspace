@@ -7,12 +7,12 @@ Creates <dest>/family-127/ as a git repository holding:
   REQUEST.md         the request to paste when opening the Argus project
   paper/<title>/     each manuscript of the family (TeX sources and PDF), from openai/math @ 4eaee875
   paper/lean/        the family's Lean from openai/math, when it has any
-  earlier/           Argus's earlier work on the family: first-pass drafts, the second-pass review
-                     when there is one, and the item-by-item verification, all as claims to check
+  earlier/           Argus's first-pass drafts on the family: claims to check, not results. Earlier
+                     verdicts (the second-pass review, the verification list) are left out on
+                     purpose, so the team rechecks rather than copies them
 
 Paths default to this server's clones; override with OPENAI_MATH and ARGUS_MATHEMATICS.
 """
-import json
 import os
 import re
 import shutil
@@ -64,21 +64,8 @@ def main(argv):
     fam = RESULTS / "openai-math" / "families" / fid
     earlier = ws / "earlier"
     earlier.mkdir()
-    for part in ("first-pass", "argus-review"):
-        if (fam / part).is_dir():
-            shutil.copytree(fam / part, earlier / part)
-    record = next((f for f in json.loads((RESULTS / "openai-math" / "verification.json").read_text())["families"]
-                   if f["family_id"] == fid), None)
-    if record:
-        lines = [f"# Earlier verification of family {fid}", "",
-                 f"Category given then: {record['final']} (A improvement, B error found, C verification, E nothing).",
-                 "These are claims to recheck, not results.", ""]
-        for item in record["items"]:
-            lines += [f"- [{item['kind']} · {item['verdict']}] {item['what']}",
-                      f"  - OpenAI baseline: {item.get('openai_baseline') or '—'}",
-                      f"  - what was checked: {item.get('check_done') or '—'}",
-                      f"  - why: {item.get('reason') or '—'}"]
-        (earlier / "verification.md").write_text("\n".join(lines) + "\n")
+    if (fam / "first-pass").is_dir():
+        shutil.copytree(fam / "first-pass", earlier / "first-pass")
     template = (HERE / f"REQUEST.{lang}.md").read_text()
     paper_list = "\n".join(f"- `paper/{p}/`" for p in papers)
     request = (template.replace("{FAMILY}", fid).replace("{TITLE}", title).replace("{COMMIT}", COMMIT)
