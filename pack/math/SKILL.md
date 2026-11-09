@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.2.0
+version: 0.2.1
 setup: setup/install
 ---
 
@@ -126,6 +126,9 @@ Theorem 1.1 of `paper.tex` (sec. 1): I(sign p) ≤ 8d√n for every degree-d PTF
   with rigorous bounds. Ship a short script that reads the witness from a file and rechecks it.
   Floating-point agreement, a near-solution, a long search, a timeout or a solver's UNKNOWN is
   not a result.
+- A checker is only as good as what it rejects. Before relying on a verification script, feed it
+  a few deliberately broken inputs (a flipped sign, an off-by-one bound, a witness that breaks
+  one hypothesis) and confirm it rejects each one; say in the report that it did.
 - A SAT answer counts once the assignment is expanded and checked against the original
   mathematical conditions, not only the encoding. A bare UNSAT is not a refutation without a
   checked proof certificate or a Lean proof.
