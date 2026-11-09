@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""make-workspace: prepare an Argus (ts-core) workspace for one OpenAI family, review mode.
+
+    make-workspace 127 /path/to/workspaces [--lang en|zh]
+
+Creates <dest>/family-127/ as a git repository holding:
+  REQUEST.md         the request to paste when opening the Argus project
+  paper/<title>/     each manuscript of the family (TeX sources and PDF), from openai/math @ 4eaee875
+  paper/lean/        the family's Lean from openai/math, when it has any
+  earlier/           Argus's earlier work on the family: first-pass drafts, the second-pass review
+                     when there is one, and the item-by-item verification, all as claims to check
+
+Paths default to this server's clones; override with OPENAI_MATH and ARGUS_MATHEMATICS.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+UPSTREAM = Path(os.environ.get("OPENAI_MATH", "/home/argustest/zimo/openai-math-audit/openai-math"))
+RESULTS = Path(os.environ.get("ARGUS_MATHEMATICS", "/home/argustest/argustest2/argus-mathematics"))
+COMMIT = "4eaee87548250b2682affda7d05d947c05554bae"
+HERE = Path(__file__).resolve().parent
+LEAN = {"en": {True: "`paper/lean/` has OpenAI's description of its Lean for this family.", False: "OpenAI has no Lean for this family."},
+        "zh": {True: "`paper/lean/` 里是 OpenAI 对这个家族所写 Lean 的说明。", False: "OpenAI 没有为这个家族写 Lean。"}}
+
+
+def family_entry(fid):
+    text = (UPSTREAM / "CONTENTS.md").read_text()
+    start = text.index(f"**{fid}. ")
+    nxt = re.search(r"\*\*\d{3}\. ", text[start + 6:])
+    block = text[start: start + 6 + nxt.start()] if nxt else text[start:]
+    title = re.match(r"\*\*\d{3}\. (.+?)\*\*", block).group(1).strip()
+    papers = sorted(set(re.findall(r"\]\(preprints/([^/]+)/", block)))
+    lean = re.search(r"\[Lean\]\(lean/docs/(\d+)\.md\)", block)
+    return title, papers, bool(lean)
+
+
+def ignore_bulk(_dir, names):
+    return [n for n in names if n in (".lake", "build-cache", "__pycache__")]
+
+
+def main(argv):
+    if len(argv) < 2 or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 2
+    fid = argv[0].zfill(3)
+    lang = argv[argv.index("--lang") + 1] if "--lang" in argv else "en"
+    ws = Path(argv[1]).resolve() / f"family-{fid}"
+    if ws.exists():
+        print(f"{ws} already exists; remove it or choose another place.")
+        return 1
+    title, papers, has_lean = family_entry(fid)
+    (ws / "paper").mkdir(parents=True)
+    for p in papers:
+        shutil.copytree(UPSTREAM / "preprints" / p, ws / "paper" / p, ignore=ignore_bulk)
+    if has_lean:
+        lean = ws / "paper" / "lean"
+        lean.mkdir()
+        shutil.copy(UPSTREAM / "lean" / "docs" / f"{fid}.md", lean / f"{fid}.md")
+    fam = RESULTS / "openai-math" / "families" / fid
+    earlier = ws / "earlier"
+    earlier.mkdir()
+    for part in ("first-pass", "argus-review"):
+        if (fam / part).is_dir():
+            shutil.copytree(fam / part, earlier / part)
+    record = next((f for f in json.loads((RESULTS / "openai-math" / "verification.json").read_text())["families"]
+                   if f["family_id"] == fid), None)
+    if record:
+        lines = [f"# Earlier verification of family {fid}", "",
+                 f"Category given then: {record['final']} (A improvement, B error found, C verification, E nothing).",
+                 "These are claims to recheck, not results.", ""]
+        for item in record["items"]:
+            lines += [f"- [{item['kind']} · {item['verdict']}] {item['what']}",
+                      f"  - OpenAI baseline: {item.get('openai_baseline') or '—'}",
+                      f"  - what was checked: {item.get('check_done') or '—'}",
+                      f"  - why: {item.get('reason') or '—'}"]
+        (earlier / "verification.md").write_text("\n".join(lines) + "\n")
+    template = (HERE / f"REQUEST.{lang}.md").read_text()
+    paper_list = "\n".join(f"- `paper/{p}/`" for p in papers)
+    request = (template.replace("{FAMILY}", fid).replace("{TITLE}", title).replace("{COMMIT}", COMMIT)
+               .replace("{PAPERS}", paper_list).replace("{LEAN}", LEAN[lang][has_lean]))
+    (ws / "REQUEST.md").write_text(request)
+    subprocess.run(["git", "init", "-q"], cwd=ws, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=ws, check=True)
+    subprocess.run(["git", "-c", "user.name=lbx154", "-c", "user.email=145820328+lbx154@users.noreply.github.com",
+                    "commit", "-q", "-m", f"Family {fid}: papers and earlier work"], cwd=ws, check=True)
+    print(f"{ws}: {len(papers)} paper(s); earlier work {'copied' if (earlier / 'first-pass').exists() else 'none'}.")
+    print(f"Open an Argus project on {ws} with the math pack installed, and paste {ws / 'REQUEST.md'}.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
