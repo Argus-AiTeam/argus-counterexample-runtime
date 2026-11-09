@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.4.0
+version: 0.4.1
 setup: setup/install
 ---
 
@@ -208,12 +208,6 @@ quarter of an hour and be able to check the key steps in an hour.
   is an error even when the theorem is true.
 - Quote the proposition with its number and version (§3 I3). A DOI that resolves shows only that
   the work exists; when the text cannot be had, say "could not check".
-
-## Earlier drafts
-
-Put each earlier draft in one category: holds and is new; holds and reproduces the paper;
-refutes only our own attack; invalid; open, with the gap named. When a review stops short, say
-which layer failed: the argument, the decomposition, or the whole approach.
 
 ## For the Reviewer
 
