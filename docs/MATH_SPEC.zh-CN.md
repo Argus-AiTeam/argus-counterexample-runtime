@@ -1,11 +1,11 @@
 # Argus Math 顶层规格
 
-版本 0.19（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
+版本 0.20（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
 
 ## 0. 本文的地位
 
-本文是 Argus Math 的唯一权威。正本在 math runtime 仓库
-（`Argus-AiTeam/argus-counterexample-runtime` 的 `docs/MATH_SPEC.zh-CN.md`）；其他仓库里的副本以正本为准。
+本文是 Argus Math 的唯一权威，只有这一份，在 math runtime 仓库
+（`Argus-AiTeam/argus-counterexample-runtime` 的 `docs/MATH_SPEC.zh-CN.md`），别处不另存副本。
 Argus Math 全面运行在 ts-core 上（`lbx154/Argus`）；math runtime 仓库保存本文、数学 pack，并以子模块 `core/` 固定所用的 ts-core 版本。
 数学 pack 的 `SKILL.md`、角色提示、campaign 契约（OBJECTIVE/LAUNCH）、
 harness 和工具都从本文派生，并标注所依据的条款号。派生物与本文冲突时，以本文为准，派生物要改。
@@ -198,6 +198,8 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每次编�
 5. ~~交付门禁放在哪里~~ 已定：不设门禁，相信 Agent 如实报告；Reviewer 放行前亲自重跑关键检查（§4）。
 
 ## 变更记录
+
+- 0.20（2026-11-09）§0：删去 ts-core 仓库里的副本，本文只此一份。
 
 - 0.19（2026-11-09）§2、§5：审查的核验结论固定分三部分（改进、错误与不足、核验通过），导读在前；核验之后主动尝试改进，作为单独任务。
 
