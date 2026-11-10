@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.7.1
+version: 0.7.2
 setup: setup/install
 ---
 
@@ -15,16 +15,27 @@ section numbers below refer to it. Where this file and the spec disagree, the sp
   nobody can read has not done its job.
 - When the work is someone else's paper (review mode), every paper gets a reader's guide and a
   verdict in three parts: improvements, errors and shortcomings, and what was verified (below).
-- Checking is not the end. Once the main line is checked, spend real effort going past the
-  paper: a sharper constant or exponent, a weaker hypothesis, a generalization, an optimality
-  example, a simpler proof, a gap closed. Plan for it as a task of its own. Nothing is produced
-  on demand: when the push gets nowhere, say what was tried.
-- Push with computation first. Experiment before proving: search numerically for the best
-  constant, enumerate small cases, look for the extremal or the breaking example, and let what
-  you see suggest the stronger statement; then prove it, or report it as a conjecture with the
-  data. Python first; C++ or PARI/GP (`gp`) when Python is too slow; `math-ops` for exact
-  finite operations. An experiment is not a result.
+- Checking is not the end. Going past the paper is planned work with a task of its own (see
+  "For the Planner"), and everyone checking a step also asks whether it could be sharper.
+  Nothing is produced on demand: when the push gets nowhere, say what was tried.
 - Earlier drafts, ours or anyone's, are claims to check, not results to count.
+
+## Going past the paper (§2)
+
+- **Where to look**: a constant the paper leaves unnamed or never optimizes, a hypothesis the
+  proof does not use in full, a step whose loss looks wasteful, a special case that generalizes,
+  an argument that could be shorter.
+- **Compute first, then prove.** Search numerically for the best constant, enumerate small
+  cases, look for the extremal or the breaking example, and let what you see suggest the stronger
+  statement. Then prove it, or report it as a conjecture with the data. Python first; C++ or
+  PARI/GP (`gp`) when Python is too slow, and the machine has many cores, so a search can run in
+  parallel; `math-ops` for exact finite operations. An experiment is not a result.
+- **A complete small result beats a conditional large one.** A sharp constant with the example
+  that attains it, or a lemma with a counterexample at its boundary, is an improvement in full.
+  A larger extension that leans on other steps of the paper is still worth reporting, marked
+  conditional, naming exactly what it rests on.
+- **Along the way**: whoever checks a step and sees it can be tightened computes it there and
+  then and hands it to the report's "Improvements".
 
 ## Pin down the statement first
 
@@ -237,6 +248,14 @@ quarter of an hour and be able to check the key steps in an hour.
   is an error even when the theorem is true.
 - Quote the proposition with its number and version (§3 I3). A DOI that resolves shows only that
   the work exists; when the text cannot be had, say "could not check".
+
+## For the Planner
+
+In review mode a split that has worked: one task per paper to read it and write its guide; one
+for the hardest or shared module; **one to go past the paper**, whose brief names its targets
+(which constant, which hypothesis, which step) and says to compute first; and a final
+independent review. When a verdict rests on a source nobody could read, try an open
+substitute or a direct proof before leaving it as a condition.
 
 ## For the Reviewer
 

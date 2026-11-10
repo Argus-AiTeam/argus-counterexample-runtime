@@ -11,7 +11,13 @@ MATHLIB_REV="fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
 JACOBIAN_VERSION="0.23.0"
 HOME_DIR="${ARGUS_PACK_HOME:?ARGUS_PACK_HOME is not set}"
 PACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"   # the pack root; ARGUS_PACK_DIR is the setup/ folder
-export ELAN_HOME="$HOME_DIR/elan"
+# Lean and Mathlib are the same for every pack version that pins the same revisions, so they live once
+# under the state root and each pack home links to them (about 10 GB saved per version).
+STATE="${ARGUS_HOME:-$(cd "$HOME_DIR/../../.." && pwd)}"
+SHARED="$STATE/pack-shared/math"
+mkdir -p "$SHARED"
+exec 9>"$SHARED/.lock"; flock 9
+export ELAN_HOME="$SHARED/elan"
 export PATH="$ELAN_HOME/bin:$PATH"
 
 echo "== tools -> the team's tool library"
@@ -33,10 +39,12 @@ if [ ! -x "$ELAN_HOME/bin/elan" ]; then
   sh "$HOME_DIR/elan-init.sh" -y --no-modify-path --default-toolchain none
 fi
 elan toolchain install "leanprover/lean4:$LEAN_VERSION"
+rm -rf "$HOME_DIR/elan"; ln -s "$ELAN_HOME" "$HOME_DIR/elan"
 
 echo "== Mathlib workspace at $MATHLIB_REV"
-WS="$HOME_DIR/mathlib"
+WS="$SHARED/mathlib-$LEAN_VERSION-${MATHLIB_REV:0:12}"
 mkdir -p "$WS"
+rm -rf "$HOME_DIR/mathlib"; ln -s "$WS" "$HOME_DIR/mathlib"
 echo "leanprover/lean4:$LEAN_VERSION" > "$WS/lean-toolchain"
 cat > "$WS/lakefile.toml" <<EOF
 name = "math_pack_workspace"
@@ -53,7 +61,8 @@ if [ -d .lake/packages/mathlib ] && [ -f lake-manifest.json ]; then
 elif [ -n "${MATH_PACK_MATHLIB_FROM:-}" ] && [ -d "$MATH_PACK_MATHLIB_FROM/.lake/packages/mathlib" ]; then
   echo "copying built packages from $MATH_PACK_MATHLIB_FROM"
   mkdir -p .lake
-  cp -a "$MATH_PACK_MATHLIB_FROM/.lake/packages" .lake/
+  # hard links when on the same filesystem: no second copy of the built packages
+  cp -al "$MATH_PACK_MATHLIB_FROM/.lake/packages" .lake/ 2>/dev/null || cp -a "$MATH_PACK_MATHLIB_FROM/.lake/packages" .lake/
   cp "$MATH_PACK_MATHLIB_FROM/lake-manifest.json" .
 else
   lake update
