@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.7.0
+version: 0.7.1
 setup: setup/install
 ---
 
@@ -19,6 +19,11 @@ section numbers below refer to it. Where this file and the spec disagree, the sp
   paper: a sharper constant or exponent, a weaker hypothesis, a generalization, an optimality
   example, a simpler proof, a gap closed. Plan for it as a task of its own. Nothing is produced
   on demand: when the push gets nowhere, say what was tried.
+- Push with computation first. Experiment before proving: search numerically for the best
+  constant, enumerate small cases, look for the extremal or the breaking example, and let what
+  you see suggest the stronger statement; then prove it, or report it as a conjecture with the
+  data. Python first; C++ or PARI/GP (`gp`) when Python is too slow; `math-ops` for exact
+  finite operations. An experiment is not a result.
 - Earlier drafts, ours or anyone's, are claims to check, not results to count.
 
 ## Pin down the statement first
@@ -134,6 +139,10 @@ in Section 6, the cited results the corollaries use.
   for the proof before reporting a missing one.
 
 ## Counterexamples and computations
+
+Computation is an ordinary move, in checking as in going further: compute examples, try the
+cheap falsification before the long proof, and when a finite exact subproblem appears, look in
+`math-ops find` before writing your own code. The Planner splits work this way too.
 
 - A counterexample is checked against every hypothesis of the original statement, not against
   your reformulation of it.
