@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/spec-v0.24-1f6feb?style=flat-square" alt="spec v0.24">
+  <img src="https://img.shields.io/badge/spec-v0.25-1f6feb?style=flat-square" alt="spec v0.25">
   <img src="https://img.shields.io/badge/core-Argus%20ts--core-24292f?style=flat-square" alt="Argus ts-core">
   <img src="https://img.shields.io/badge/Lean-4.31.0%20%2B%20Mathlib-6f42c1?style=flat-square" alt="Lean 4.31.0">
   <img src="https://img.shields.io/badge/Jacobian-0.23.0-2da44e?style=flat-square" alt="Jacobian 0.23.0">
@@ -32,7 +32,7 @@
 - **核验它。** 主定理依靠的那几步，用手算、精确计算或 Lean 重新核过。指出错误和缺口时，一定指向原文里的那句话。
 - **往前推一步。** 更好的常数、更弱的假设、最优性例子，每一条都和原结论并排写出。
 
-在 OpenAI 的 721 篇论文上，它在 373 个家族中的 134 个里找到了对原结论的改进，没有发现数学错误。
+在 OpenAI 的 721 篇论文上，它在 373 个家族中的 142 个里找到了对原结论的改进，没有发现数学错误。
 [查看成果 →](https://github.com/Argus-AiTeam/argus-mathematics/tree/main/openai-math)
 
 ## 它怎么工作
@@ -47,12 +47,12 @@ flowchart LR
   R -- 退回 --> E
   R -- 通过 --> M
   M -- 信 + 报告 --> O
-  E -. 使用 .-> T{{math-lean-verify<br/>math-cite<br/>math-ops<br/>math-claims}}
-  R -. 重跑 .-> T
+  E -. 使用 .-> T{{math-lean-verify<br/>math-cite<br/>math-ops<br/>math-claims<br/>math-oai-verify}}
+  R -. 核对重跑结果 .-> T
 ```
 
 **内核**（Argus ts-core，在 [`core/`](core/)）在编程 Agent 命令行（Copilot、Codex、Claude Code 或 Pi）上运行四个角色，
-在角色之间传信、保存记录。**数学 pack**（[`pack/math/`](pack/math/)）告诉团队怎么做数学，并提供四个工具：
+在角色之间传信、保存记录。**数学 pack**（[`pack/math/`](pack/math/)）告诉团队怎么做数学，并提供第一批工具（团队可以修改，也可以自己加）：
 
 | 工具 | 作用 |
 |---|---|
@@ -60,6 +60,8 @@ flowchart LR
 | `math-cite` | 取回被引文献（arXiv、DOI），在所引的那个版本里读到被引的命题 |
 | `math-ops` | Jacobian 的约 1,800 种带类型的精确运算：Smith 标准形、格、带证书的 LP/SAT、同调…… |
 | `math-claims` | 从报告里读出命题表并汇总，可重新编译"Lean 已证"背后的文件 |
+| `math-oai-verify` | 在固定提交上原样编译作者自己的 Lean（Lean 4.34.1），打印每个定理依赖的公理 |
+| `math-lean-source-closure` | 列出作者某个模块的导入闭包及固定版本的源文件 |
 
 ## 它坚持什么
 

@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.8.0
+version: 0.8.1
 setup: setup/install
 ---
 
@@ -37,7 +37,7 @@ section numbers below refer to it. Where this file and the spec disagree, the sp
 - **Along the way**: whoever checks a step and sees it can be tightened computes it there and
   then and hands it to the report's "Improvements".
 
-## Pin down the statement first
+## Pin down the statement first (§2)
 
 - Write the exact statement at the top of the report before any other work: the objects and
   their domains, the order of quantifiers, normalizations and conventions (which norm, whether 0
@@ -46,7 +46,7 @@ section numbers below refer to it. Where this file and the spec disagree, the sp
 - A statement that fails only under a literal misreading or a transcription slip is a scope
   correction, not a refutation; report it as one.
 
-## Reading a paper
+## Reading a paper (§2, I3)
 
 - Start from the main theorem and find the few steps it stands on: the estimate everything feeds
   into, the construction a counterexample rests on, the lemma whose hypotheses are tight. Spend
@@ -149,7 +149,7 @@ in Section 6, the cited results the corollaries use.
   `lean/ComparatorChallenges/` are such statements; their proofs live under `lean/OAI/`). Look
   for the proof before reporting a missing one.
 
-## Counterexamples and computations
+## Counterexamples and computations (§2, I5)
 
 Computation is an ordinary move, in checking as in going further: compute examples, try the
 cheap falsification before the long proof, and when a finite exact subproblem appears, look in
@@ -168,7 +168,7 @@ cheap falsification before the long proof, and when a finite exact subproblem ap
   mathematical conditions, not only the encoding. A bare UNSAT is not a refutation without a
   checked proof certificate or a Lean proof.
 
-## Exact operations: Jacobian
+## Exact operations: Jacobian (§4)
 
 `math-ops` gives the Jacobian library: about six hundred typed, bounded operations (exact
 linear algebra over Z and Q, Smith and Hermite forms, lattices and abelian groups, polynomial
@@ -211,7 +211,7 @@ quarter of an hour and be able to check the key steps in an hour.
   pre-emptive defences and scope boilerplate are written out.
 - Write each fact once. The report is the record; no plans, audits or status files beside it (§7).
 
-## Is it new?
+## Is it new? (§5)
 
 - Before calling an advance new, remove everything the cited theorems already imply and say what
   remains. A parameter choice, a worked example, a certificate, a constant made explicit, or a
@@ -219,7 +219,7 @@ quarter of an hour and be able to check the key steps in an hour.
 - Check whether the paper's own proof already gives the "improvement": it often does.
 - "No prior result found" names what was searched and when; it is not evidence of novelty.
 
-## Lean
+## Lean (I1, I2)
 
 - `math-lean-verify path/to/Main.lean` compiles against Lean 4.31.0 and the pinned Mathlib and
   says, in words, whether any declaration uses `sorry` and which axioms each theorem rests on
@@ -244,7 +244,7 @@ quarter of an hour and be able to check the key steps in an hour.
   finite case analysis, an algebraic identity. Line counts are not results, and a port of
   someone else's Lean is reported as a port.
 
-## Citations
+## Citations (I3)
 
 - `math-cite <arXiv id or DOI>` fetches what is openly available, prints the version you have,
   and for a DOI looks for an arXiv preprint of the same title.
@@ -255,7 +255,7 @@ quarter of an hour and be able to check the key steps in an hour.
 - Quote the proposition with its number and version (§3 I3). A DOI that resolves shows only that
   the work exists; when the text cannot be had, say "could not check".
 
-## For the Planner
+## For the Planner (§2, §4)
 
 In review mode a split that has worked: one task per paper to read it and write its guide; one
 for the hardest or shared module; **one to go past the paper**, whose brief names its targets
@@ -263,7 +263,7 @@ for the hardest or shared module; **one to go past the paper**, whose brief name
 and computations by someone who did not write them; and a final independent review. When a verdict rests on a source nobody could read, try an open
 substitute or a direct proof before leaving it as a condition.
 
-## For the Reviewer
+## For the Reviewer (§4, I2, I4, I8)
 
 Read the work as the colleague it is written for.
 
@@ -287,7 +287,7 @@ it got wrong, and say in a line at the top what changed; add a tool when a check
 one nobody needs. A change to `math-lean-verify` keeps its job: a file passes only if it compiles
 without `sorry` and rests on the standard axioms.
 
-## What not to do
+## What not to do (I6, I7, §8)
 
 - Do not modify Argus, this pack or the spec; report a problem with them to the operator
   (§3 I7). The `argus-maintenance` skill is not for this work.

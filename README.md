@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/spec-v0.24-1f6feb?style=flat-square" alt="spec v0.24">
+  <img src="https://img.shields.io/badge/spec-v0.25-1f6feb?style=flat-square" alt="spec v0.25">
   <img src="https://img.shields.io/badge/core-Argus%20ts--core-24292f?style=flat-square" alt="Argus ts-core">
   <img src="https://img.shields.io/badge/Lean-4.31.0%20%2B%20Mathlib-6f42c1?style=flat-square" alt="Lean 4.31.0">
   <img src="https://img.shields.io/badge/Jacobian-0.23.0-2da44e?style=flat-square" alt="Jacobian 0.23.0">
@@ -36,7 +36,7 @@
   by side with the original statement.
 
 On OpenAI's collection of 721 manuscripts, this found improvements over the stated result in
-134 of 373 families, and no mathematical error.
+142 of 373 families, and no mathematical error.
 [See the results →](https://github.com/Argus-AiTeam/argus-mathematics/tree/main/openai-math)
 
 ## How it works
@@ -51,13 +51,13 @@ flowchart LR
   R -- send back --> E
   R -- accepted --> M
   M -- letter + report --> O
-  E -. uses .-> T{{math-lean-verify<br/>math-cite<br/>math-ops<br/>math-claims}}
-  R -. reruns .-> T
+  E -. uses .-> T{{math-lean-verify<br/>math-cite<br/>math-ops<br/>math-claims<br/>math-oai-verify}}
+  R -. checks the reruns .-> T
 ```
 
 The **core** (Argus ts-core, in [`core/`](core/)) runs the four roles on a coding-agent CLI
 (Copilot, Codex, Claude Code or Pi), passes letters between them and keeps the record. The **math
-pack** ([`pack/math/`](pack/math/)) tells the team how to do mathematics and gives it four tools:
+pack** ([`pack/math/`](pack/math/)) tells the team how to do mathematics and gives it its first tools (the team may change them and add more):
 
 | Tool | What it gives |
 |---|---|
@@ -65,6 +65,8 @@ pack** ([`pack/math/`](pack/math/)) tells the team how to do mathematics and giv
 | `math-cite` | Fetches the cited work (arXiv, DOI) so the cited proposition is read in the version cited |
 | `math-ops` | About 1,800 typed exact operations from Jacobian: Smith forms, lattices, certified LP/SAT, homology… |
 | `math-claims` | Reads the claims tables back out of reports, sums them up, and can recompile the Lean behind them |
+| `math-oai-verify` | Compiles the authors' own Lean at the pinned commit, as written (Lean 4.34.1), and prints what each theorem rests on |
+| `math-lean-source-closure` | Lists the import closure of an author module with pinned sources |
 
 ## What it holds to
 
