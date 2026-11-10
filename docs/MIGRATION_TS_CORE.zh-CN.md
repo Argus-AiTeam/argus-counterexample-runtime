@@ -1,6 +1,8 @@
 # Argus Math 迁移到 ts-core
 
-> **进度（2026-11-09）**：第一步完成。数学 pack 在本仓库 `pack/math/`（含 Lean、引用、Jacobian 工具），运维脚本在 `ops/`；旧 Python runtime 已退役，保存在 `backup/python-runtime` 分支。服务器上已装好 ts-core 和数学 pack，下一步是试跑。
+> **进度（2026-11-10）**：迁移完成。数学 pack 在本仓库 `pack/math/`，运维脚本在 `ops/`；旧 Python runtime 保存在 `backup/python-runtime` 分支。
+> 已在 ts-core 上实际运行：127、179 两族与纯 Copilot 的对照，368 族的三组消融，以及成果库中 8 个无产出家族的重跑（全部得到经独立复核的改进）。
+> 现行规则以 [MATH_SPEC.zh-CN.md](MATH_SPEC.zh-CN.md)（0.25）为准；本文以下内容是迁移时的方案，保留作记录。
 
 2026-11-09 · 依据 [MATH_SPEC.zh-CN.md](MATH_SPEC.zh-CN.md) 0.15 版
 
