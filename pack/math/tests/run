@@ -9,5 +9,6 @@ fail=0
 for f in SorryRejected AdmitRejected MetaAxiomRejected NativeDecideRejected; do
   if "$verify" "$here/$f.lean" >/dev/null; then echo "FAIL: $f.lean was accepted"; fail=1; fi
 done
+python3 -m unittest discover -s "$here/tools" -p 'test_*.py' 2>/dev/null || { echo "FAIL: tool unit tests"; fail=1; }
 [ $fail = 0 ] && echo "all checks behave as expected"
 exit $fail

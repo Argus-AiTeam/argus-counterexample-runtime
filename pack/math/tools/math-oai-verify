@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+# Build an OpenAI Lean module (openai/math @ 4eaee875, Lean 4.34.1) and print the axioms of its theorems.
+"""math-oai-verify: compile the authors' own Lean, as they wrote it, and say what it rests on.
+
+    math-oai-verify OAI.Probability.SKValue.Main OAI.SKValue.value_consequences [more theorems]
+
+Builds the module and everything it imports in the OpenAI workspace $MATH_OAI_WORKSPACE (the pinned
+commit, its own Lean and Mathlib; only the closure of the module is built, the first time in minutes,
+then from cache), then prints `#print axioms` for each theorem named.
+
+Exit status: 0 the module builds and every theorem rests only on propext, Classical.choice and
+Quot.sound; 1 it does not build, or a theorem uses sorryAx or another axiom; 2 the workspace is
+missing or the build could not run here (neither a proof nor a failure).
+"""
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+STANDARD = {"propext", "Classical.choice", "Quot.sound"}
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0 if argv else 2
+    module, theorems = argv[0], argv[1:]
+    ws = Path(os.environ.get("MATH_OAI_WORKSPACE", "")).expanduser()
+    if not (ws / "lakefile.lean").exists():
+        print("Not verified: MATH_OAI_WORKSPACE is unset or is not the OpenAI Lean workspace.")
+        return 2
+    lake = Path(os.environ.get("ELAN_HOME", "~/.elan")).expanduser() / "bin" / "lake"
+    print(f"Building {module} in {ws} (Lean {(ws / 'lean-toolchain').read_text().strip()}) ...")
+    built = subprocess.run([str(lake), "build", module], cwd=ws, capture_output=True, text=True)
+    out = built.stdout + built.stderr
+    if built.returncode != 0:
+        unknown = re.search(r"unknown (module|package|target)[^\n]*", out)
+        print(f"{module}: does not build." if not unknown else f"Not verified: {unknown.group(0)}")
+        print("  " + "\n  ".join(out.strip().splitlines()[-12:]))
+        return 2 if unknown else 1
+    sorry = re.findall(r"declaration uses [`'\"]sorry[`'\"]", out)
+    print(f"{module}: builds." + (f" {len(sorry)} declaration(s) in its closure use sorry." if sorry else ""))
+    if not theorems:
+        return 1 if sorry else 0
+    with tempfile.NamedTemporaryFile("w", suffix=".lean", dir=ws, delete=False) as probe:
+        probe.write(f"import {module}\n" + "".join(f"#print axioms {t}\n" for t in theorems))
+    try:
+        done = subprocess.run([str(lake), "env", "lean", probe.name], cwd=ws, capture_output=True, text=True)
+    finally:
+        os.unlink(probe.name)
+    text = done.stdout + done.stderr
+    bad = 0
+    for t in theorems:
+        m = re.search(rf"'{re.escape(t)}' depends on axioms: \[([^\]]*)\]", text, re.S)
+        if m:
+            axioms = {a.strip() for a in m.group(1).replace("\n", " ").split(",") if a.strip()}
+            extra = sorted(axioms - STANDARD)
+            print(f"  {t}: " + ("only the standard axioms." if not extra else "also rests on " + ", ".join(extra) + "."))
+            bad += bool(extra)
+        elif re.search(rf"'{re.escape(t)}' does not depend on any axioms", text):
+            print(f"  {t}: no axioms.")
+        else:
+            print(f"  {t}: not found or not printed.")
+            print("  " + "\n  ".join(text.strip().splitlines()[-6:]))
+            bad += 1
+    return 1 if bad or sorry else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.7.3
+version: 0.8.0
 setup: setup/install
 ---
 
@@ -226,6 +226,12 @@ quarter of an hour and be able to check the key steps in an hour.
   beyond Lean's standard three. Only a file that passes counts as Lean evidence. Exit status 2
   means the file could not be verified here (missing module, timeout): neither a proof nor a
   failure.
+- **The authors' own Lean** (OpenAI's, at the pinned commit) uses Lean 4.34.1 and another Mathlib,
+  so `math-lean-verify` cannot compile it. `math-oai-verify <module> <theorem>…` builds that module
+  in the OpenAI workspace exactly as written and prints the axioms of each theorem: this is the
+  check that the paper's Lean proves what its scope note says. Take the module and theorem names from
+  the comparator's JSON (`solution_module`). The first build of a closure takes minutes.
+  `math-lean-source-closure` lists a module's import closure with pinned sources, without building.
 - Prefer `decide` to `native_decide`; the latter trusts compiled code and is reported as such.
 - Keep a proof in one file where you can. Do not create a lakefile at the project root: it hides
   the prebuilt Mathlib and starts a rebuild of several gigabytes.
@@ -253,16 +259,17 @@ quarter of an hour and be able to check the key steps in an hour.
 
 In review mode a split that has worked: one task per paper to read it and write its guide; one
 for the hardest or shared module; **one to go past the paper**, whose brief names its targets
-(which constant, which hypothesis, which step) and says to compute first; and a final
-independent review. When a verdict rests on a source nobody could read, try an open
+(which constant, which hypothesis, which step) and says to compute first; one to rerun the Lean
+and computations by someone who did not write them; and a final independent review. When a verdict rests on a source nobody could read, try an open
 substitute or a direct proof before leaving it as a condition.
 
 ## For the Reviewer
 
 Read the work as the colleague it is written for.
 
-- Rerun the Lean and the computations the conclusion rests on, and check that what the report
-  says each step rests on matches its evidence.
+- The Lean and the computations the conclusion rests on are rerun by someone who did not write
+  them. The Reviewer cannot run commands: the Planner opens that rerun as a task of its own, and
+  the Reviewer checks its output and that what the report says each step rests on matches it.
 - Check every "the paper is wrong" against the sentence it points to, and every improvement
   against the paper's actual statement: misquoting the baseline is the most common mistake.
 - Ask whether an improvement is already implied by the paper's own proof or only changes a
@@ -274,8 +281,8 @@ Read the work as the colleague it is written for.
 
 ## The tools are the team's (§4)
 
-`math-lean-verify`, `math-cite`, `math-ops` and `math-claims` live in the team's tools/ with any
-others the team writes. When one is wrong or missing something, fix it there, test it on a case
+`math-lean-verify`, `math-cite`, `math-ops`, `math-claims`, `math-oai-verify` and
+`math-lean-source-closure` live in the team's tools/ with any others the team writes. When one is wrong or missing something, fix it there, test it on a case
 it got wrong, and say in a line at the top what changed; add a tool when a check recurs; remove
 one nobody needs. A change to `math-lean-verify` keeps its job: a file passes only if it compiles
 without `sorry` and rests on the standard axioms.

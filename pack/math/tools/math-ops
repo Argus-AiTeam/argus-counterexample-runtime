@@ -25,7 +25,15 @@ def jacobian():
 
 
 def call(args):
-    done = subprocess.run([jacobian(), *args], capture_output=True, text=True)
+    executable = jacobian()
+    try:
+        done = subprocess.run([executable, *args], capture_output=True, text=True)
+    except FileNotFoundError:
+        return 2, "", (
+            f"Jacobian is unavailable: executable {executable!r} or its shebang "
+            "interpreter could not be found. Check both paths, and set "
+            "MATH_JACOBIAN to a working Jacobian executable."
+        )
     return done.returncode, done.stdout, done.stderr
 
 

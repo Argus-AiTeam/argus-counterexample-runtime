@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+# Fetch a pinned Lean source import closure, checking GitHub blob identities and recording external boundaries.
+"""Download sources, not compiled proofs. Uses public GitHub endpoints; no credentials required."""
+import argparse
+import concurrent.futures
+import hashlib
+import json
+from pathlib import Path
+import re
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+
+MODULE = re.compile(r"[A-Za-z_][A-Za-z_0-9]*(?:\.[A-Za-z_][A-Za-z_0-9]*)*")
+
+
+def imports(source):
+    """Read ordinary module names in the header without lexing the command body."""
+    def trivia(pos):
+        while pos < len(source):
+            if source[pos].isspace():
+                pos += 1
+            elif source.startswith("--", pos):
+                end = source.find("\n", pos)
+                pos = len(source) if end < 0 else end
+            elif source.startswith("/-", pos):
+                depth = 1
+                pos += 2
+                while depth:
+                    if pos == len(source):
+                        raise ValueError("Unclosed Lean block comment in header")
+                    if source.startswith("/-", pos):
+                        depth += 1
+                        pos += 2
+                    elif source.startswith("-/", pos):
+                        depth -= 1
+                        pos += 2
+                    else:
+                        pos += 1
+            else:
+                break
+        return pos
+
+    def word(pos):
+        match = re.match(r"[A-Za-z_][A-Za-z_0-9]*", source[pos:])
+        return match[0] if match else ""
+
+    pos = trivia(0)
+    if word(pos) == "module":
+        pos = trivia(pos + len("module"))
+    if word(pos) == "prelude":
+        pos = trivia(pos + len("prelude"))
+    result = []
+    while pos < len(source):
+        if word(pos) == "public":
+            pos = trivia(pos + len("public"))
+        if word(pos) == "meta":
+            pos = trivia(pos + len("meta"))
+        if word(pos) != "import":
+            break
+        pos = trivia(pos + len("import"))
+        if word(pos) == "all":
+            pos = trivia(pos + len("all"))
+        match = MODULE.match(source, pos)
+        if not match or match[0] in ("import", "public", "meta", "all"):
+            raise ValueError(f"Missing or unsupported imported module at offset {pos}")
+        pos = match.end()
+        if pos < len(source) and not (
+                source[pos].isspace() or source.startswith(("--", "/-"), pos)):
+            raise ValueError(f"Unsupported imported module syntax at offset {pos}")
+        result.append(match[0])
+        next_pos = trivia(pos)
+        if next_pos < len(source) and "\n" not in source[pos:next_pos]:
+            raise ValueError(f"Unsupported same-line import tail at offset {next_pos}")
+        pos = next_pos
+    return sorted(set(result))
+
+
+def get(url):
+    request = urllib.request.Request(url, headers={"User-Agent": "math-lean-source-closure"})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            if error.code not in (429, 500, 502, 503, 504) or attempt == 2:
+                raise
+        except (TimeoutError, urllib.error.URLError):
+            if attempt == 2:
+                raise
+        time.sleep(2 ** attempt)
+
+
+def blob_sha(data):
+    return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        epilog="Headers support module/prelude and [public] [meta] import [all] NAME "
+               "with ordinary ASCII module names, one directive per line. "
+               "Unsupported module syntax and same-line tails are rejected.")
+    parser.add_argument("repo", help="Public GitHub owner/repository")
+    parser.add_argument("commit", help="Full 40-character commit SHA")
+    parser.add_argument("entry", nargs="+", help="Lean module names")
+    parser.add_argument("--prefix", action="append", default=None,
+                        help="Follow this module namespace (repeatable; default OAI)")
+    parser.add_argument("--source-root", default="lean", help="Repository Lean source directory")
+    parser.add_argument("--out", type=Path, required=True, help="Source destination")
+    parser.add_argument("--manifest", type=Path, required=True, help="JSON provenance and closure")
+    parser.add_argument("--jobs", type=int, default=8, help="Concurrent downloads (default 8)")
+    parser.add_argument("--index-dir", action="append", default=[],
+                        help="Index this bounded module subtree (repeatable); reject truncated trees")
+    parser.add_argument("--metadata-dir", type=Path,
+                        help="Retain the GitHub JSON used for source attribution")
+    args = parser.parse_args()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args.repo):
+        parser.error("repo must be owner/name")
+    if not re.fullmatch(r"[0-9a-f]{40}", args.commit):
+        parser.error("commit must be a full lowercase SHA")
+    prefixes = args.prefix or ["OAI"]
+    if any(not MODULE.fullmatch(name) for name in args.entry + prefixes + args.index_dir):
+        parser.error("entries and prefixes must be ordinary Lean module names")
+    if args.jobs < 1 or args.jobs > 16:
+        parser.error("jobs must be between 1 and 16")
+    root = args.source_root.strip("/")
+    if not root or any(part in (".", "..") for part in root.split("/")):
+        parser.error("source-root must be a relative directory without traversal")
+    directories = {}
+    records = {}
+    pending = set(args.entry)
+    external = set()
+    metadata = []
+
+    def get_json(url, name):
+        data = get(url)
+        if args.metadata_dir:
+            path = args.metadata_dir / (name.replace("/", "_") + ".json")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            metadata.append({"path": str(path), "url": url})
+        return json.loads(data)
+
+    api = f"https://api.github.com/repos/{args.repo}"
+    for module in args.index_dir:
+        directory = root + "/" + module.replace(".", "/")
+        parent, name = directory.rsplit("/", 1)
+        if parent not in directories:
+            listing = get_json(f"{api}/contents/{parent}?ref={args.commit}", parent)
+            if not isinstance(listing, list) or len(listing) >= 1000:
+                raise ValueError(f"Directory listing may be incomplete: {parent}")
+            directories[parent] = {item["name"]: item for item in listing}
+        entry = directories[parent].get(name)
+        if entry is None or entry["type"] != "dir":
+            raise ValueError(f"No directory metadata for {directory}")
+        tree = get_json(f"{api}/git/trees/{entry['sha']}?recursive=1", directory + ".tree")
+        if tree.get("truncated", True) or tree.get("sha") != entry["sha"]:
+            raise ValueError(f"Wrong or truncated subtree: {directory}; choose a smaller --index-dir")
+        for item in tree["tree"]:
+            if item["type"] == "blob":
+                path = directory + "/" + item["path"]
+                parent_path, filename = path.rsplit("/", 1)
+                directories.setdefault(parent_path, {})[filename] = {
+                    "type": "file", "sha": item["sha"]}
+
+    def follows(name):
+        return any(name == prefix or name.startswith(prefix + ".") for prefix in prefixes)
+
+    def repository_path(name):
+        return root + "/" + name.replace(".", "/") + ".lean"
+
+    def download(name):
+        path = repository_path(name)
+        data = get(f"https://raw.githubusercontent.com/{args.repo}/{args.commit}/{path}")
+        directory, filename = path.rsplit("/", 1)
+        expected = directories[directory].get(filename)
+        if expected is None or expected.get("type") != "file":
+            raise ValueError(f"No GitHub file metadata for {path}")
+        actual = blob_sha(data)
+        if actual != expected["sha"]:
+            raise ValueError(f"Git blob mismatch for {path}: {actual} != {expected['sha']}")
+        dependencies = imports(data.decode("utf-8"))
+        target = args.out / (name.replace(".", "/") + ".lean")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if target.exists() and target.read_bytes() != data:
+            raise ValueError(f"Refusing to overwrite differing source: {target}")
+        target.write_bytes(data)
+        return name, {
+            "path": path, "git_blob": actual, "sha256": hashlib.sha256(data).hexdigest(),
+            "bytes": len(data), "imports": dependencies,
+        }
+
+    while pending:
+        wave = sorted(pending - records.keys())
+        pending.clear()
+        if not wave:
+            break
+        for directory in sorted({repository_path(name).rsplit("/", 1)[0] for name in wave}):
+            if directory in directories:
+                continue
+            quoted = urllib.parse.quote(directory, safe="/")
+            listing = get_json(
+                f"{api}/contents/{quoted}?ref={args.commit}", directory)
+            if not isinstance(listing, list) or len(listing) >= 1000:
+                raise ValueError(f"Directory listing may be incomplete: {directory}")
+            directories[directory] = {item["name"]: item for item in listing}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
+            for name, record in pool.map(download, wave):
+                records[name] = record
+                for dependency in record["imports"]:
+                    if follows(dependency):
+                        if dependency not in records:
+                            pending.add(dependency)
+                    else:
+                        external.add(dependency)
+    manifest = {
+        "repo": args.repo, "commit": args.commit, "source_root": root,
+        "entries": args.entry, "followed_prefixes": prefixes,
+        "external_imports": sorted(external),
+        "indexed_subtrees": args.index_dir,
+        "metadata": metadata,
+        "modules": {name: records[name] for name in sorted(records)},
+        "evidence": "Sources match pinned GitHub directory blob identities; no compilation performed.",
+    }
+    args.manifest.parent.mkdir(parents=True, exist_ok=True)
+    args.manifest.write_text(json.dumps(manifest, indent=2) + "\n")
+    print(f"{len(records)} modules, {sum(r['bytes'] for r in records.values())} bytes; "
+          f"{len(external)} external import boundaries.")
+    print(f"Manifest: {args.manifest}; source identities checked, not a proof check.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, KeyError) as error:
+        print(f"math-lean-source-closure: {error}", file=sys.stderr)
+        sys.exit(1)

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# Fetch a cited work (arXiv id or DOI) in the version cited, to read the proposition itself.
+# Fetch versioned citations; report unavailable arXiv metadata without a traceback.
 """math-cite: fetch a cited work so you can read the proposition you cite.
+
+Source downloads distinguish tar archives from single-file gzipped TeX.
 
     math-cite arXiv:2002.08717v2      # or 2002.08717, math/0206203v2
     math-cite 10.4310/CAG.2009.v17.n4.a4
@@ -12,13 +14,17 @@ full text is saved only when the DOI resolves to an open PDF. Read the propositi
 quote it, with its number and the version you read, in your report. When the text cannot be
 obtained, say so in the report: "could not check".
 """
+import gzip
+import io
 import json
 import re
 import sys
+import tarfile
 import urllib.parse
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
+import zlib
 from pathlib import Path
 
 UA = {"User-Agent": "argus-math-cite/0.1 (mailto:argus@example.invalid)"}
@@ -37,15 +43,22 @@ def save(data, path):
 
 
 def arxiv(ident, into):
-    data, _, _ = get("https://export.arxiv.org/api/query?id_list=" + urllib.parse.quote(ident))
-    entry = ET.fromstring(data).find(ATOM + "entry")
+    try:
+        data, _, _ = get("https://export.arxiv.org/api/query?id_list=" + urllib.parse.quote(ident))
+        entry = ET.fromstring(data).find(ATOM + "entry")
+    except (OSError, ET.ParseError) as error:
+        print(f"arXiv:{ident}: metadata could not be retrieved ({error}).")
+        print(f"  Try the open page https://arxiv.org/abs/{ident}; metadata failure does not establish that the work is missing.")
+        if re.search(r"v\d+$", ident):
+            print(f"  Pinned PDF alternative: https://arxiv.org/pdf/{ident}")
+        return 2
     if entry is None or entry.find(ATOM + "title") is None:
         print(f"arXiv:{ident}: not found.")
         return 1
     title = " ".join(entry.findtext(ATOM + "title").split())
     authors = ", ".join(a.findtext(ATOM + "name") for a in entry.findall(ATOM + "author"))
     abs_url = entry.findtext(ATOM + "id")
-    version = abs_url.rsplit("/", 1)[-1]
+    version = urllib.parse.urlsplit(abs_url).path.removeprefix("/abs/")
     print(f"arXiv:{version} — {title}")
     print(f"  {authors}")
     print(f"  first posted {entry.findtext(ATOM + 'published')[:10]}, this version {entry.findtext(ATOM + 'updated')[:10]}")
@@ -57,13 +70,24 @@ def arxiv(ident, into):
         print(f"  PDF not saved: {error}")
     try:
         src, kind, _ = get(f"https://arxiv.org/e-print/{version}")
-        suffix = ".tar.gz" if src[:2] == b"\x1f\x8b" else ".tex"
+        suffix = source_suffix(src)
         print(f"  saved {save(src, into / f'arxiv-{stem}-source{suffix}')} (TeX source)")
-    except Exception:
-        pass
+    except (OSError, EOFError, zlib.error) as error:
+        print(f"  TeX source not saved: {error}")
     if not re.search(r"v\d+$", ident):
         print(f"  You asked for the latest version; cite it as arXiv:{version}.")
     return 0
+
+
+def source_suffix(src):
+    if src[:2] != b"\x1f\x8b":
+        return ".tex"
+    unpacked = gzip.decompress(src)
+    try:
+        with tarfile.open(fileobj=io.BytesIO(unpacked), mode="r:"):
+            return ".tar.gz"
+    except tarfile.ReadError:
+        return ".tex.gz"
 
 
 def doi(ident, into):
@@ -111,7 +135,8 @@ def preprints(title):
     for entry in ET.fromstring(data).findall(ATOM + "entry"):
         found = " ".join((entry.findtext(ATOM + "title") or "").split())
         if found and found.lower().strip(". ") == title.lower().strip(". "):
-            print(f"  arXiv preprint: {entry.findtext(ATOM + 'id').rsplit('/', 1)[-1]} (same title; check it matches the published version you cite)")
+            version = urllib.parse.urlsplit(entry.findtext(ATOM + "id")).path.removeprefix("/abs/")
+            print(f"  arXiv preprint: {version} (same title; check it matches the published version you cite)")
 
 
 def main(argv):

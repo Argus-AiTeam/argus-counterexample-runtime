@@ -1,14 +1,14 @@
 # Argus Math 顶层规格
 
-版本 0.23（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
+版本 0.24（§10 第 1、3、4、5 项已定，第 2 项待定） · 2026-11-09
 
 ## 0. 本文的地位
 
 本文是 Argus Math 的唯一权威，只有这一份，在 math runtime 仓库
 （`Argus-AiTeam/argus-counterexample-runtime` 的 `docs/MATH_SPEC.zh-CN.md`），别处不另存副本。
 Argus Math 全面运行在 ts-core 上（`lbx154/Argus`）；math runtime 仓库保存本文、数学 pack，并以子模块 `core/` 固定所用的 ts-core 版本。
-数学 pack 的 `SKILL.md`、角色提示、campaign 契约（OBJECTIVE/LAUNCH）、
-harness 和工具都从本文派生，并标注所依据的条款号。派生物与本文冲突时，以本文为准，派生物要改。
+数学 pack（`SKILL.md`、setup、工具）和运维脚本（`ops/`，含给每个家族的请求模板）从本文派生，并标注所依据的条款号。
+角色提示属于 ts-core，不在本文管辖内。派生物与本文冲突时，以本文为准，派生物要改。
 
 本文只由运维（lbx154）修改。每次修改升版本号，并在文末变更记录里写明改了什么、为什么。
 Agent 对本文和 Argus runtime 只有读权限；数学工具归团队，可以增删改（§4）。
@@ -184,12 +184,18 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每次编�
 ## 9. 防止偏移
 
 - 派生物里每条规则标注依据的条款号；找不到依据的规则删掉。
-- 每条不变量至少对应一个自动测试；pack 和提示里出现与本文冲突的概念（例如阶段机），测试失败。
-- 在 Agent 沙箱里，本文和 runtime 只读。
+- pack 的测试（`pack/math/tests/run`）检查 I1 的机械部分：`math-lean-verify` 拒绝 `sorry`、`admit`、自设公理和 `native_decide`，
+  以及各工具的行为。其余不变量靠 Reviewer 和本文，没有自动测试。
+- Agent 的沙箱只挂载工作区、pack 环境和团队库；本文和 runtime 不在其中。
 
 ## 已知偏差
 
-目前没有。旧的 Python runtime（账本、证明图、阶段机、门禁、哈希证书）已退役，代码保存在本仓库的
+- **I2、§4：Reviewer 不能执行命令。** ts-core 的 Reviewer 只读，"亲自重跑"由 Planner 另开一个非作者的工程任务完成，
+  Reviewer 核对其结果。效果相同，但 Reviewer 本人没有运行。
+- **§9：** 只有 I1 有自动测试，见上。
+- **作者 Lean：** OpenAI 的 Lean 用 Lean 4.34.1 和另一版 Mathlib，pack 用 4.31.0；原样编译要用 pack 准备的 OpenAI 工作区（见 `SKILL.md`）。
+
+旧的 Python runtime（账本、证明图、阶段机、门禁、哈希证书）已退役，代码保存在本仓库的
 `backup/python-runtime` 分支，仅供查阅。Argus Math 运行在 ts-core 上，迁移方案见
 [`MIGRATION_TS_CORE.zh-CN.md`](MIGRATION_TS_CORE.zh-CN.md)。
 
@@ -198,10 +204,12 @@ Lean 工具链和 Mathlib 由 pack 的 setup 安装到固定版本；每次编�
 1. ~~`math check` 是否拦截~~ 0.8 起取消 `math check`，见第 5 项。
 2. 攻关模式下没有 Lean 证明的"证明"，能否作为最终结论交付，还是只能标为"限定结果"？
 3. ~~工具语言~~ 已定：工具用 Python 写，作为数学 pack 的一部分（§4）。
-4. ~~进程模型~~ 已定：每个 campaign 一个进程（§6）。
+4. ~~进程模型~~ 已定：每个 campaign 是 ts-core 的一个项目（§6）。
 5. ~~交付门禁放在哪里~~ 已定：不设门禁，相信 Agent 如实报告；Reviewer 放行前亲自重跑关键检查（§4）。
 
 ## 变更记录
+
+- 0.24（2026-11-10）§0、§9、已知偏差、§10.4：删去 OBJECTIVE/LAUNCH/harness 等旧概念；如实写明只有 I1 有自动测试、Reviewer 不能执行命令、作者 Lean 版本不同。
 
 - 0.23（2026-11-10）§2：完整的小结果优先于有条件的大推广；未读到原件的条件先设法解除。依据 368 族 A/B/C 消融。
 

@@ -8,6 +8,7 @@ set -euo pipefail
 
 LEAN_VERSION="v4.31.0"
 MATHLIB_REV="fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
+OAI_COMMIT="4eaee87548250b2682affda7d05d947c05554bae"
 JACOBIAN_VERSION="0.23.0"
 HOME_DIR="${ARGUS_PACK_HOME:?ARGUS_PACK_HOME is not set}"
 PACK_DIR="$(cd "$(dirname "$0")/.." && pwd)"   # the pack root; ARGUS_PACK_DIR is the setup/ folder
@@ -70,21 +71,54 @@ else
   lake exe cache get
 fi
 
+echo "== OpenAI's Lean workspace (openai/math @ $OAI_COMMIT)"
+# The authors' Lean at the pinned commit, with its own toolchain and Mathlib, so their proofs can be
+# compiled as written (math-oai-verify). Prepared once under the shared root: from MATH_PACK_OAI_FROM
+# (a checkout of openai/math at that commit) or by a sparse clone; then its dependencies and the
+# Mathlib cache. Only modules a team asks for are ever built. Skip with MATH_PACK_OAI=0.
+OAI="$SHARED/oai-${OAI_COMMIT:0:8}"
+if [ "${MATH_PACK_OAI:-1}" != 0 ]; then
+  if [ ! -f "$OAI/lakefile.lean" ]; then
+    if [ -n "${MATH_PACK_OAI_FROM:-}" ] && [ -f "$MATH_PACK_OAI_FROM/lean/lakefile.lean" ]; then
+      cp -al "$MATH_PACK_OAI_FROM/lean" "$OAI" 2>/dev/null || cp -a "$MATH_PACK_OAI_FROM/lean" "$OAI"
+    else
+      tmp="$SHARED/oai-clone"; rm -rf "${tmp:?}"
+      git clone --quiet --filter=blob:none --no-checkout https://github.com/openai/math.git "$tmp"
+      git -C "$tmp" sparse-checkout set lean && git -C "$tmp" checkout --quiet "$OAI_COMMIT"
+      mv "$tmp/lean" "$OAI"; rm -rf "${tmp:?}"
+    fi
+  fi
+  elan toolchain install "$(cat "$OAI/lean-toolchain")"
+  if [ ! -d "$OAI/.lake/packages/mathlib/.lake/build" ]; then (cd "$OAI" && lake exe cache get); fi
+fi
+
 echo "== Lean and Mathlib into the pack home (hard links)"
-for pair in "$ELAN_HOME:elan" "$WS:mathlib"; do
+pairs=("$ELAN_HOME:elan" "$WS:mathlib"); [ -f "$OAI/lakefile.lean" ] && pairs+=("$OAI:oai")
+for pair in "${pairs[@]}"; do
   rm -rf "${HOME_DIR:?}/${pair##*:}"
   cp -al "${pair%%:*}" "$HOME_DIR/${pair##*:}" 2>/dev/null || cp -a "${pair%%:*}" "$HOME_DIR/${pair##*:}"
 done
 cd "$HOME_DIR/mathlib"
 
 echo "== Jacobian $JACOBIAN_VERSION (typed exact operations)"
+# The roles' sandbox mounts the pack home but not the operator's home, so the venv must not rest on
+# an interpreter there (a conda or pyenv Python is invisible to the roles). Prefer a standalone Python
+# installed inside the pack home with uv; otherwise a system Python outside the home directory.
 PY=""
-for candidate in python3.13 python3.12 python3; do
-  if command -v "$candidate" >/dev/null && "$candidate" -c 'import sys; sys.exit(0 if (3,12) <= sys.version_info[:2] < (3,14) else 1)'; then PY="$(command -v "$candidate")"; break; fi
-done
-if [ -z "$PY" ]; then echo "Jacobian needs Python 3.12 or 3.13; none found on PATH." >&2; exit 1; fi
-if [ ! -x "$HOME_DIR/jacobian/bin/jacobian" ]; then
-  "$PY" -m venv "$HOME_DIR/jacobian"
+UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
+if [ -x "$UV" ]; then
+  UV_PYTHON_INSTALL_DIR="$HOME_DIR/python" "$UV" python install 3.13 >/dev/null
+  PY="$(UV_PYTHON_INSTALL_DIR="$HOME_DIR/python" "$UV" python find --managed-python 3.13)"
+fi
+if [ -z "$PY" ]; then
+  for candidate in /usr/bin/python3.13 /usr/bin/python3.12 /usr/local/bin/python3.13 /usr/local/bin/python3.12; do
+    [ -x "$candidate" ] && { PY="$candidate"; break; }
+  done
+fi
+if [ -z "$PY" ]; then echo "Jacobian needs Python 3.12 or 3.13 outside the home directory (or uv to install one)." >&2; exit 1; fi
+case "$(readlink -f "$PY")" in "$HOME"/*) case "$(readlink -f "$PY")" in "$HOME_DIR"/*) ;; *) echo "Python $PY lives under the home directory; the roles cannot see it." >&2; exit 1;; esac;; esac
+if [ ! -x "$HOME_DIR/jacobian/bin/jacobian" ] || [ "$(readlink -f "$HOME_DIR/jacobian/bin/python3")" != "$(readlink -f "$PY")" ]; then
+  "$PY" -m venv --clear "$HOME_DIR/jacobian"
   "$HOME_DIR/jacobian/bin/pip" install --quiet "jacobian==$JACOBIAN_VERSION"
 fi
 "$HOME_DIR/jacobian/bin/jacobian" catalog | "$PY" -c 'import json,sys; n=len(json.load(sys.stdin)["operations"]); print(f"{n} operations"); sys.exit(0 if n else 1)'
@@ -97,6 +131,7 @@ cat > "$HOME_DIR/env" <<'EOF'
 PATH=${ARGUS_PACK_HOME}/bin:${ARGUS_PACK_HOME}/elan/bin:${PATH}
 ELAN_HOME=${ARGUS_PACK_HOME}/elan
 MATH_LEAN_WORKSPACE=${ARGUS_PACK_HOME}/mathlib
+MATH_OAI_WORKSPACE=${ARGUS_PACK_HOME}/oai
 MATH_JACOBIAN=${ARGUS_PACK_HOME}/jacobian/bin/jacobian
 EOF
 echo "ready"
