@@ -1,7 +1,7 @@
 ---
 name: math
 description: "Mathematics: read, explain and verify papers; prove, refute or strengthen statements; Lean 4 where it settles a doubt. Everything is written so a mathematician can follow and check it."
-version: 0.8.1
+version: 0.8.2
 setup: setup/install
 ---
 
@@ -211,6 +211,19 @@ quarter of an hour and be able to check the key steps in an hour.
   pre-emptive defences and scope boilerplate are written out.
 - Write each fact once. The report is the record; no plans, audits or status files beside it (§7).
 
+## Reading costs more than writing (§7)
+
+Most of what a project spends is what gets read into the conversation, turn after turn; what you
+write costs far less. So read as a mathematician does, with a finger on the line you need:
+
+- Find the place first (`rg` for the label, the lemma name, the symbol), then read that stretch
+  of the file with a line range. Read a whole `.tex` file only when you mean to read all of it.
+- When you change the report, read the section you are changing, not the whole report again.
+- For a cited work, get the text first (`math-cite`, or `pdftotext` on the PDF) and search it;
+  look at a page image only when the formula itself does not come through.
+- What you learned once and will need again (where the key estimate sits, what a cited lemma
+  says) goes in a line of the report or the wiki, so nobody pays to find it twice.
+
 ## Is it new? (§5)
 
 - Before calling an advance new, remove everything the cited theorems already imply and say what
@@ -255,7 +268,7 @@ quarter of an hour and be able to check the key steps in an hour.
 - Quote the proposition with its number and version (§3 I3). A DOI that resolves shows only that
   the work exists; when the text cannot be had, say "could not check".
 
-## For the Planner (§2, §4)
+## For the Planner (§2, §4, §7)
 
 In review mode a split that has worked: one task per paper to read it and write its guide; one
 for the hardest or shared module; **one to go past the paper**, whose brief names its targets
@@ -263,7 +276,13 @@ for the hardest or shared module; **one to go past the paper**, whose brief name
 and computations by someone who did not write them; and a final independent review. When a verdict rests on a source nobody could read, try an open
 substitute or a direct proof before leaving it as a condition.
 
-## For the Reviewer (§4, I2, I4, I8)
+When work comes back from the Reviewer, the letter that sends it back says which passages to
+change and what is wrong with each, so the one fixing it reads those and not the whole report.
+If the same task comes back a second time, look at the split or the route before sending it
+round again: two rejections usually mean the task asks for more than one result, or the route is
+wrong.
+
+## For the Reviewer (§4, §7, I2, I4, I8)
 
 Read the work as the colleague it is written for.
 
@@ -277,6 +296,9 @@ Read the work as the colleague it is written for.
 - Read the guide as someone new to the paper. A guide that does not make the paper easier, a
   report you cannot follow, a buried verdict, or text leaning on disclaimers and identifiers
   goes back for rewriting, the same as an error (§3 I8).
+- When you send work back, list everything you found in one letter, each with where it is and
+  what would fix it; a small fix you can state exactly, state, so the task need not reopen for it.
+  On a second look, read what changed since the first and the passages it touches (§7).
 - You do not accept your own work or your own citations (§3 I4).
 
 ## The tools are the team's (§4)
